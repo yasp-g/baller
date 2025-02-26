@@ -3,6 +3,7 @@ from datetime import date
 # from ..config import API_SPORTS_KEY, API_SPORTS_BASE_URL
 from ..config import FOOTBALL_DATA_API_KEY
 
+# Football-data API
 class FootballAPI:
     def __init__(self):
         self.base_url = "https://api.football-data.org/v4"
@@ -11,52 +12,88 @@ class FootballAPI:
         }
         self.client = httpx.AsyncClient(headers=self.headers)
     
-    async def get_competitions(self, country=None):
-        """Get available competitions (leagues), optionally filtered by country"""
-        params = {}
-        if country:
-            params["areas"] = country
-        
-        response = await self.client.get(f"{self.base_url}/competitions", params=params)
-        response.raise_for_status()
-        return response.json()
-    
-    async def get_matches(self, competition_id=None, team_id=None, date_from=None, date_to=None, status=None):
-        """Get matches with various filters"""
-        params = {}
-        
-        if date_from:
-            params["dateFrom"] = date_from
-        if date_to:
-            params["dateTo"] = date_to
-        if status:
-            params["status"] = status
-            
-        # Endpoint changes based on filters
-        if competition_id:
-            endpoint = f"{self.base_url}/competitions/{competition_id}/matches"
-        elif team_id:
-            endpoint = f"{self.base_url}/teams/{team_id}/matches"
+    async def get_areas(self, area_id=None):
+        """Get available areas, optionally filtered by area_id"""
+        if area_id:
+            endpoint = f"{self.base_url}/areas/{area_id}"
         else:
-            endpoint = f"{self.base_url}/matches"
-        
-        response = await self.client.get(endpoint, params=params)
-        response.raise_for_status()
-        return response.json()
-    
-    async def get_match(self, match_id):
-        """Get detailed information about a specific match"""
-        response = await self.client.get(f"{self.base_url}/matches/{match_id}")
-        response.raise_for_status()
-        return response.json()
-    
-    async def get_standings(self, competition_id, season=None):
-        """Get competition standings"""
-        params = {}
-        if season:
-            params["season"] = season
+            endpoint = f"{self.base_url}/areas"
             
-        response = await self.client.get(f"{self.base_url}/competitions/{competition_id}/standings", params=params)
+        response = await self.client.get(endpoint)
+        response.raise_for_status()
+        return response.json()
+    
+    async def get_competitions(self, areas=None):
+        """Get available competitions (leagues), optionally filtered by areas"""
+        filters = {}
+        if areas:
+            filters["areas"] = areas
+        
+        response = await self.client.get(f"{self.base_url}/competitions", params=filters)
+        response.raise_for_status()
+        return response.json()
+    
+    async def get_competition(self, competition_id):
+        """Get detailed information about a specific competition"""
+        response = await self.client.get(f"{self.base_url}/competitions/{competition_id}")
+        response.raise_for_status()
+        return response.json()
+        
+    async def get_standings(self, competition_id, season=None, matchday=None, date=None):
+        """Get competition standings"""
+        filters = {}
+        if season:
+            filters["season"] = season
+        if matchday:
+            filters["matchday"] = matchday
+        if date:
+            filters["date"] = date
+            
+        response = await self.client.get(f"{self.base_url}/competitions/{competition_id}/standings", params=filters)
+        response.raise_for_status()
+        return response.json()
+    
+    async def get_competition_matches(self, competition_id, date_from=None, date_to=None, stage=None, status=None, matchday=None, group=None, season=None):
+        """Get matches for a specific competition with optional filters"""
+        filters = {}
+        if date_from:
+            filters["dateFrom"] = date_from
+        if date_to:
+            filters["dateTo"] = date_to
+        if stage:
+            filters["stage"] = stage
+        if status:
+            filters["status"] = status
+        if matchday:
+            filters["matchday"] = matchday
+        if group:
+            filters["group"] = group
+        if season:
+            filters["season"] = season
+            
+        response = await self.client.get(f"{self.base_url}/competitions/{competition_id}/matches", params=filters)
+        response.raise_for_status()
+        return response.json()
+    
+    async def get_competition_teams(self, competition_id, season=None):
+        """Get teams for a specific competition"""
+        filters = {}
+        if season:
+            filters["season"] = season
+            
+        response = await self.client.get(f"{self.base_url}/competitions/{competition_id}/teams", params=filters)
+        response.raise_for_status()
+        return response.json()
+    
+    async def get_top_scorers(self, competition_id, limit=10, season=None):
+        """Get top scorers for a competition"""
+        filters = {}
+        if limit:
+            filters["limit"] = limit
+        if season:
+            filters["season"] = season
+            
+        response = await self.client.get(f"{self.base_url}/competitions/{competition_id}/scorers", params=filters)
         response.raise_for_status()
         return response.json()
     
@@ -66,17 +103,25 @@ class FootballAPI:
         response.raise_for_status()
         return response.json()
     
-    async def get_team_matches(self, team_id, status=None, venue=None, limit=None):
+    async def get_team_matches(self, team_id, date_from=None, date_to=None, season=None, competitions=None, status=None, venue=None, limit=None):
         """Get matches for a specific team with optional filters"""
-        params = {}
+        filters = {}
+        if date_from:
+            filters["dateFrom"] = date_from
+        if date_to:
+            filters["dateTo"] = date_to
+        if season:
+            filters["season"] = season
+        if competitions:
+            filters["competitions"] = competitions
         if status:
-            params["status"] = status
+            filters["status"] = status
         if venue:
-            params["venue"] = venue  # HOME or AWAY
+            filters["venue"] = venue  # HOME or AWAY
         if limit:
-            params["limit"] = limit
+            filters["limit"] = limit
             
-        response = await self.client.get(f"{self.base_url}/teams/{team_id}/matches", params=params)
+        response = await self.client.get(f"{self.base_url}/teams/{team_id}/matches", params=filters)
         response.raise_for_status()
         return response.json()
     
@@ -86,38 +131,66 @@ class FootballAPI:
         response.raise_for_status()
         return response.json()
     
-    async def get_top_scorers(self, competition_id, season=None, limit=10):
-        """Get top scorers for a competition"""
-        params = {}
-        if season:
-            params["season"] = season
+    async def get_person_matches(self, person_id, date_from=None, date_to=None, status=None, competitions=None, limit=None, offset=None):
+        """Get matches for a specific person with optional filters"""
+        filters = {}
+        if date_from:
+            filters["dateFrom"] = date_from
+        if date_to:
+            filters["dateTo"] = date_to
+        if status:
+            filters["status"] = status
+        if competitions:
+            filters["competitions"] = competitions
         if limit:
-            params["limit"] = limit
+            filters["limit"] = limit
+        if offset:
+            filters["offset"] = offset
             
-        response = await self.client.get(f"{self.base_url}/competitions/{competition_id}/scorers", params=params)
+        response = await self.client.get(f"{self.base_url}/persons/{person_id}/matches", params=filters)
         response.raise_for_status()
         return response.json()
     
-    async def head_to_head(self, team1_id, team2_id, limit=10):
-        """Get head-to-head matches between two teams"""
-        # Football-data doesn't have a direct H2H endpoint, so we need to get team matches and filter
-        team1_matches = await self.get_team_matches(team1_id, limit=50)
+    async def get_match(self, match_id):
+        """Get detailed information about a specific match"""
+        response = await self.client.get(f"{self.base_url}/matches/{match_id}")
+        response.raise_for_status()
+        return response.json()
+    
+    async def get_matches(self, date_from=date.today(), date_to=None, competitions=None, ids=None, status=None):
+        """Get matches across competitions with required date_from parameter"""
+        filters = {
+            "dateFrom": date_from,
+        }
         
-        # Filter matches where the opponent is team2
-        h2h_matches = []
-        for match in team1_matches.get("matches", []):
-            home_team_id = match["homeTeam"]["id"]
-            away_team_id = match["awayTeam"]["id"]
+        if date_to:
+            filters["dateTo"] = date_to
+        if competitions:
+            filters["competitions"] = competitions
+        if ids:
+            filters["ids"] = ids
+        if status:
+            filters["status"] = status
             
-            if (home_team_id == team1_id and away_team_id == team2_id) or \
-               (home_team_id == team2_id and away_team_id == team1_id):
-                h2h_matches.append(match)
-                
-                # Stop once we have enough matches
-                if len(h2h_matches) >= limit:
-                    break
-        
-        return {"matches": h2h_matches[:limit]}
+        response = await self.client.get(f"{self.base_url}/matches", params=filters)
+        response.raise_for_status()
+        return response.json()
+    
+    async def get_head_to_head(self, match_id, limit=10, date_from=None, date_to=None, competitions=None):
+        """Get head-to-head matches for teams in a specific match"""
+        filters = {}
+        if limit:
+            filters["limit"] = limit
+        if date_from:
+            filters["dateFrom"] = date_from
+        if date_to:
+            filters["dateTo"] = date_to
+        if competitions:
+            filters["competitions"] = competitions
+            
+        response = await self.client.get(f"{self.base_url}/matches/{match_id}/head2head", params=filters)
+        response.raise_for_status()
+        return response.json()
     
     async def close(self):
         """Close the HTTP client"""
