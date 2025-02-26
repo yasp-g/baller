@@ -1,7 +1,15 @@
 [project]
 name = "baller"
 version = "0.1.0"
-description = "Add your description here"
+description = "A conversational Discord chatbot using API-Sports"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "anthropic>=0.47.1",
+    "discord-py>=2.5.0",
+    "fastapi>=0.115.8",
+    "httpx>=0.28.1",
+    "openai>=1.64.0",
+    "python-dotenv>=1.0.1",
+    "uvicorn>=0.34.0",
+]
