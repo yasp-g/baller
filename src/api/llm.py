@@ -39,14 +39,14 @@ class LLMClient:
     def __init__(self):
         self.client = AsyncOpenAI(
             api_key=DEEPSEEK_API_KEY,
-            base_url="https://api.deepseek.com/v1"  # Deepseek API endpoint
+            base_url="https://api.deepseek.com"  # Deepseek API endpoint
         )
     
     async def generate_response(self, user_message, context_data=None):
         """Generate a conversational response using Deepseek's model"""
         
         system_prompt = """You are a helpful football assistant. You have access to football data 
-        provided by API-Sports. Respond conversationally to user queries about football matches, 
+        provided by football-data API. Respond conversationally to user queries about football matches, 
         leagues, teams, and players based on the data provided."""
         
         # Format context data for the LLM
