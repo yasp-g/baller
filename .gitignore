@@ -177,5 +177,4 @@ cython_debug/
 .vscode/
 
 # Local test scripts
-sandbox.py
-hello.py
+sandbox/
