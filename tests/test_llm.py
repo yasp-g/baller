@@ -5,7 +5,7 @@ async def test_llm():
     llm = LLMClient()
     
     # Test with just a question
-    response1 = await llm.generate_response("Who won the Premier League last season?")
+    response1 = await llm.generate_response("Who won the Bundesliga last season and when did it conclude?")
     print("=== Basic Question ===")
     print(response1)
     
@@ -14,10 +14,10 @@ async def test_llm():
         "response": [
             {
                 "league": {
-                    "name": "Premier League",
+                    "name": "Bundesliga",
                     "standings": [[
-                        {"rank": 1, "team": {"name": "Manchester City"}, "points": 89},
-                        {"rank": 2, "team": {"name": "Arsenal"}, "points": 86}
+                        {"rank": 1, "team": {"name": "FC Bayern Munich"}, "points": 58},
+                        {"rank": 2, "team": {"name": "Bayern 04 Leverkusen"}, "points": 50}
                     ]]
                 }
             }
@@ -25,7 +25,7 @@ async def test_llm():
     }
     
     response2 = await llm.generate_response(
-        "Who's at the top of the Premier League?", 
+        "Who's at the top of the Bundesliga?", 
         sample_data
     )
     print("\n=== Question with Data ===")

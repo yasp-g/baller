@@ -1,4 +1,5 @@
 import asyncio
+from datetime import date, timedelta
 from src.api.sports import FootballAPI
 from src.api.llm import LLMClient
 
@@ -17,26 +18,30 @@ async def test_commands():
     api = FootballAPI()
     llm = LLMClient()
     ctx = MockContext()
+
+    # Constants for Germany, Bundesliga, and Bayern Munich
+    GERMANY_ID = 2088
+    BUNDESLIGA_ID = 2002
+    BAYERN_MUNICH_ID = 5
+    today = date.today()
     
     # Simulate processing a conversation
-    user_message = "Who's playing in the Premier League today?"
+    user_message = "Who's playing in the Bundesliga this week?"
     print(f"User: {user_message}")
     
     # Get relevant data (similar to what commands.py would do)
-    from datetime import datetime
-    today = datetime.now().strftime("%Y-%m-%d")
-    fixtures = await api.get_fixtures(league_id=39, date=today)
+    fixtures = await api.get_matches(date_from=today, date_to=today + timedelta(days=7), competitions=2002)
     
     # Generate response
     response = await llm.generate_response(user_message, fixtures)
     await ctx.send(content=response)
     
     # Test another query
-    user_message2 = "What are the current Premier League standings?"
+    user_message2 = "What are the current Bundesliga standings?"
     print(f"\nUser: {user_message2}")
     
     # Get standings data
-    standings = await api.get_standings(league_id=39)
+    standings = await api.get_standings(competition_id=2002)
     
     # Generate response
     response2 = await llm.generate_response(user_message2, standings)
