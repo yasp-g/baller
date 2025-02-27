@@ -118,112 +118,131 @@ class BallerCommands(commands.Cog):
     @commands.command(name="competitions")
     async def competitions(self, ctx, area=None):
         """Get available competitions, optionally filtered by country area ID"""
-        competitions = await self.football_api.get_competitions(areas=area)
-        
-        embed = discord.Embed(title="Available Football Competitions", color=discord.Color.blue())
-        
-        for comp in competitions.get("competitions", [])[:10]:  # Limit to top 10
-            embed.add_field(
-                name=f"{comp.get('name')} ({comp.get('area', {}).get('name')})",
-                value=f"ID: {comp.get('id')}",
-                inline=False
-            )
-        
-        await ctx.send(embed=embed)
-    
-    @commands.command(name="standings")
-    async def standings(self, ctx, competition_id: int):
-        """Get standings for a specific competition"""
-        standings = await self.football_api.get_standings(competition_id)
-        
-        # Process and display standings
-        league_name = standings.get("competition", {}).get("name", "Unknown League")
-        
-        embed = discord.Embed(title=f"{league_name} Standings", color=discord.Color.green())
-        
-        standings_data = standings.get("standings", [])[0].get("table", []) if standings.get("standings") else []
-        
-        for team in standings_data[:10]:  # Limit to top 10
-            embed.add_field(
-                name=f"{team.get('position')}. {team.get('team', {}).get('name')}",
-                value=f"Points: {team.get('points')} | W-D-L: {team.get('won')}-{team.get('draw')}-{team.get('lost')}",
-                inline=False
-            )
-        
-        await ctx.send(embed=embed)
-        
-    @commands.command(name="matches")
-    async def matches(self, ctx, competition_id: int = None, days: int = 7):
-        """Get upcoming matches, optionally filtered by competition ID"""
-        today = date.today()
-        end_date = today + timedelta(days=days)
-        
-        if competition_id:
-            matches = await self.football_api.get_competition_matches(
-                competition_id=competition_id,
-                date_from=today,
-                date_to=end_date,
-                status="SCHEDULED"
-            )
-        else:
-            matches = await self.football_api.get_matches(
-                date_from=today,
-                date_to=end_date,
-                status="SCHEDULED"
-            )
-        
-        match_list = matches.get("matches", [])
-        
-        if not match_list:
-            await ctx.send("No upcoming matches found for this period.")
-            return
-        
-        # Group matches by date
-        matches_by_date = {}
-        for match in match_list:
-            match_date = match.get("utcDate", "")[:10]  # Get YYYY-MM-DD format
-            if match_date not in matches_by_date:
-                matches_by_date[match_date] = []
-            matches_by_date[match_date].append(match)
-        
-        # Create embeds - one embed per date to avoid hitting limits
-        for match_date, day_matches in matches_by_date.items():
-            if len(day_matches) == 0:
-                continue
-                
-            # Format date nicely
-            try:
-                nice_date = datetime.strptime(match_date, "%Y-%m-%d").strftime("%A, %B %d")
-            except:
-                nice_date = match_date
-                
-            embed = discord.Embed(
-                title=f"Matches for {nice_date}",
-                color=discord.Color.blue()
-            )
+        try:
+            competitions = await self.football_api.get_competitions(areas=area)
             
-            # Add competition name to title if filtering
-            if competition_id:
-                comp_name = day_matches[0].get("competition", {}).get("name", "")
-                embed.title = f"{comp_name} Matches for {nice_date}"
+            embed = discord.Embed(title="Available Football Competitions", color=discord.Color.blue())
             
-            # Add up to 25 matches (Discord field limit)
-            for match in day_matches[:25]:
-                home = match.get("homeTeam", {}).get("name", "Unknown")
-                away = match.get("awayTeam", {}).get("name", "Unknown")
-                time = match.get("utcDate", "")
-                # Format time nicely - from ISO format to HH:MM
-                if time:
-                    try:
-                        time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%SZ").strftime("%H:%M UTC")
-                    except:
-                        time = time.split("T")[1][:5] if "T" in time else ""
-                
-                comp = match.get("competition", {}).get("name", "")
+            for comp in competitions.get("competitions", [])[:10]:  # Limit to top 10
                 embed.add_field(
-                    name=f"{home} vs {away}",
-                    value=f"🕒 {time}" + (f" | 🏆 {comp}" if not competition_id else ""),
+                    name=f"{comp.get('name')} ({comp.get('area', {}).get('name')})",
+                    value=f"ID: {comp.get('id')}",
                     inline=False
                 )
             
             await ctx.send(embed=embed)
+        except Exception as e:
+            # Record the error for LLM context
+            self.llm_client.record_command_error(e, command="competitions")
+            await ctx.send(f"Sorry, I couldn't retrieve the competitions: {str(e)}")
+    
+    @commands.command(name="standings")
+    async def standings(self, ctx, competition_id: int):
+        """Get standings for a specific competition"""
+        try:
+            standings = await self.football_api.get_standings(competition_id)
+            
+            # Process and display standings
+            league_name = standings.get("competition", {}).get("name", "Unknown League")
+            
+            embed = discord.Embed(title=f"{league_name} Standings", color=discord.Color.green())
+            
+            standings_data = standings.get("standings", [])[0].get("table", []) if standings.get("standings") else []
+            
+            if not standings_data:
+                await ctx.send(f"No standings data available for {league_name}")
+                return
+                
+            for team in standings_data[:10]:  # Limit to top 10
+                embed.add_field(
+                    name=f"{team.get('position')}. {team.get('team', {}).get('name')}",
+                    value=f"Points: {team.get('points')} | W-D-L: {team.get('won')}-{team.get('draw')}-{team.get('lost')}",
+                    inline=False
+                )
+            
+            await ctx.send(embed=embed)
+        except Exception as e:
+            # Record the error for LLM context
+            self.llm_client.record_command_error(e, command=f"standings {competition_id}")
+            await ctx.send(f"Sorry, I couldn't retrieve the standings: {str(e)}")
+        
+    @commands.command(name="matches")
+    async def matches(self, ctx, competition_id: int = None, days: int = 7):
+        """Get upcoming matches, optionally filtered by competition ID"""
+        try:
+            today = date.today()
+            end_date = today + timedelta(days=days)
+            
+            if competition_id:
+                matches = await self.football_api.get_competition_matches(
+                    competition_id=competition_id,
+                    date_from=today,
+                    date_to=end_date,
+                    status="SCHEDULED"
+                )
+            else:
+                matches = await self.football_api.get_matches(
+                    date_from=today,
+                    date_to=end_date,
+                    status="SCHEDULED"
+                )
+            
+            match_list = matches.get("matches", [])
+            
+            if not match_list:
+                await ctx.send("No upcoming matches found for this period.")
+                return
+            
+            # Group matches by date
+            matches_by_date = {}
+            for match in match_list:
+                match_date = match.get("utcDate", "")[:10]  # Get YYYY-MM-DD format
+                if match_date not in matches_by_date:
+                    matches_by_date[match_date] = []
+                matches_by_date[match_date].append(match)
+            
+            # Create embeds - one embed per date to avoid hitting limits
+            for match_date, day_matches in matches_by_date.items():
+                if len(day_matches) == 0:
+                    continue
+                    
+                # Format date nicely
+                try:
+                    nice_date = datetime.strptime(match_date, "%Y-%m-%d").strftime("%A, %B %d")
+                except:
+                    nice_date = match_date
+                    
+                embed = discord.Embed(
+                    title=f"Matches for {nice_date}",
+                    color=discord.Color.blue()
+                )
+                
+                # Add competition name to title if filtering
+                if competition_id:
+                    comp_name = day_matches[0].get("competition", {}).get("name", "")
+                    embed.title = f"{comp_name} Matches for {nice_date}"
+                
+                # Add up to 25 matches (Discord field limit)
+                for match in day_matches[:25]:
+                    home = match.get("homeTeam", {}).get("name", "Unknown")
+                    away = match.get("awayTeam", {}).get("name", "Unknown")
+                    time = match.get("utcDate", "")
+                    # Format time nicely - from ISO format to HH:MM
+                    if time:
+                        try:
+                            time = datetime.strptime(time, "%Y-%m-%dT%H:%M:%SZ").strftime("%H:%M UTC")
+                        except:
+                            time = time.split("T")[1][:5] if "T" in time else ""
+                    
+                    comp = match.get("competition", {}).get("name", "")
+                    embed.add_field(
+                        name=f"{home} vs {away}",
+                        value=f"🕒 {time}" + (f" | 🏆 {comp}" if not competition_id else ""),
+                        inline=False
+                    )
+                
+                await ctx.send(embed=embed)
+        except Exception as e:
+            # Record the error for LLM context
+            self.llm_client.record_command_error(e, command=f"standings {competition_id}")
+            await ctx.send(f"Sorry, I couldn't retrieve the standings: {str(e)}")
