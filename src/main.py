@@ -2,7 +2,7 @@ import asyncio
 import uvicorn
 import threading
 import signal
-from .bot.client import FootballBot
+from .bot.client import BallerBot
 
 def run_api_server():
     """Run the FastAPI server in a separate thread"""
@@ -10,7 +10,7 @@ def run_api_server():
 
 async def run_discord_bot():
     """Run the Discord bot"""
-    bot = FootballBot()
+    bot = BallerBot()
     try:
         await bot.start_bot()
     except asyncio.CancelledError:
