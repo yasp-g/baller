@@ -4,11 +4,16 @@ from ..api.sports import FootballAPI
 from ..api.llm import LLMClient
 from datetime import datetime, date, timedelta
 
-class FootballCommands(commands.Cog):
+class BallerCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.football_api = FootballAPI()
         self.llm_client = LLMClient()
+        
+        # Register components with LLMClient for error handling
+        self.llm_client.register_api(self.football_api)
+        self.llm_client.register_commands(self)
+        
         self.conversation_history = {}  # Store conversation history by user
     
     @commands.Cog.listener()

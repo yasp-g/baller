@@ -42,6 +42,38 @@ class LLMClient:
             api_key=DEEPSEEK_API_KEY,
             base_url="https://api.deepseek.com"  # Deepseek API endpoint
         )
+        self.football_api = None
+        self.commands = None
+        self.api_errors = []
+        self.command_errors = []
+    
+    def register_api(self, api):
+        """Register the FootballAPI instance"""
+        self.football_api = api
+        
+    def register_commands(self, commands):
+        """Register the BallerCommands instance"""
+        self.commands = commands
+    
+    def record_api_error(self, error_message, endpoint=None):
+        """Record API errors for context in future responses"""
+        self.api_errors.append({
+            "endpoint": endpoint,
+            "message": str(error_message),
+            "timestamp": str(os.times()[4])  # Simple timestamp
+        })
+        # Keep only the last 5 errors
+        self.api_errors = self.api_errors[-5:]
+    
+    def record_command_error(self, error_message, command=None):
+        """Record command execution errors for context in future responses"""
+        self.command_errors.append({
+            "command": command,
+            "message": str(error_message),
+            "timestamp": str(os.times()[4])  # Simple timestamp
+        })
+        # Keep only the last 5 errors
+        self.command_errors = self.command_errors[-5:]
     
     async def generate_response(self, user_message, context_data=None):
         """Generate a conversational response using Deepseek's model"""
