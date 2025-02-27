@@ -16,8 +16,8 @@ class FootballBot(commands.Bot):
     
     async def setup_hook(self):
         # Load extensions/cogs
-        from .commands import FootballCommands
-        await self.add_cog(FootballCommands(self))
+        from .commands import BallerCommands
+        await self.add_cog(BallerCommands(self))
         print(f"Bot is ready as {self.user}")
     
     async def start_bot(self):
