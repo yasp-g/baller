@@ -1,4 +1,5 @@
 import os
+import inspect
 import anthropic
 from openai import AsyncOpenAI
 from ..config import ANTHROPIC_API_KEY, DEEPSEEK_API_KEY
@@ -10,8 +11,8 @@ from ..config import ANTHROPIC_API_KEY, DEEPSEEK_API_KEY
 #     async def generate_response(self, user_message, context_data=None):
 #         """Generate a conversational response using Claude"""
         
-#         system_prompt = """You are a helpful football assistant. You have access to football data 
-#         provided by API-Sports. Respond conversationally to user queries about football matches, 
+#         system_prompt = """You are a helpful football assistant. You have access to football data
+#         provided by API-Sports. Respond conversationally to user queries about football matches,
 #         leagues, teams, and players based on the data provided."""
         
 #         # Format context data for the LLM
@@ -45,9 +46,35 @@ class LLMClient:
     async def generate_response(self, user_message, context_data=None):
         """Generate a conversational response using Deepseek's model"""
         
-        system_prompt = """You are a helpful football assistant. You have access to football data 
-        provided by football-data API. Respond conversationally to user queries about football matches, 
-        leagues, teams, and players based on the data provided."""
+        # Create the system prompt with error context if available
+        api_context = ""
+        cmd_context = ""
+        
+        # Add API information if available
+        if self.football_api:
+            api_context = "Football API is available for fetching data."
+            if self.api_errors:
+                api_context += "\nRecent API errors:"
+                for err in self.api_errors:
+                    api_context += f"\n- {err['endpoint'] or 'Unknown endpoint'}: {err['message']}"
+        
+        # Add Commands information if available
+        if self.commands:
+            cmd_context = "Discord commands are available for user interaction."
+            if self.command_errors:
+                cmd_context += "\nRecent command errors:"
+                for err in self.command_errors:
+                    cmd_context += f"\n- {err['command'] or 'Unknown command'}: {err['message']}"
+        
+        system_prompt = f"""
+        You are a helpful football assistant. You have access to football data
+        provided by football-data API. Respond conversationally to user queries about football matches,
+        leagues, teams, and players based on the data provided.
+        
+        {api_context}
+        
+        {cmd_context}
+        """
         
         # Format context data for the LLM
         context = ""
@@ -60,11 +87,11 @@ class LLMClient:
                 messages=[
                     {
                         "role": "system",
-                        "content": system_prompt
+                        "content": system_prompt.strip()
                     },
                     {
                         "role": "user",
-                        "content": f"{context}User question: {user_message}"
+                        "content": f"{context}User question: {user_message.strip()}"
                     }
                 ],
                 max_tokens=1000,
