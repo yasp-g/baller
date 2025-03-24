@@ -1,7 +1,15 @@
 import httpx
 import logging
 from datetime import date
+from typing import Dict, Any, Optional, List, Union
 from ..config import config
+from .utils import async_retry
+from ..exceptions import (
+    APIConnectionError,
+    APIAuthenticationError,
+    APIRateLimitError,
+    APIResourceNotFoundError
+)
 
 # Football-data API
 class FootballAPI:
@@ -16,6 +24,88 @@ class FootballAPI:
             timeout=10.0 
         )
         self.logger.debug("FootballAPI initialized")
+        
+    async def _handle_request_exception(self, e: httpx.HTTPError, resource_type: Optional[str] = None, resource_id: Optional[str] = None) -> None:
+        """Handle HTTP exceptions and raise appropriate custom exceptions"""
+        if isinstance(e, httpx.TimeoutException):
+            raise APIConnectionError(
+                message="Request timed out",
+                details={"url": str(e.request.url) if e.request else None}
+            ) from e
+        
+        if isinstance(e, httpx.ConnectError):
+            raise APIConnectionError(
+                message="Failed to connect to API server",
+                details={"url": str(e.request.url) if e.request else None}
+            ) from e
+            
+        if isinstance(e, httpx.HTTPStatusError):
+            status_code = e.response.status_code
+            
+            if status_code == 401:
+                raise APIAuthenticationError(
+                    message="Authentication failed with football data API",
+                    details={"url": str(e.request.url)}
+                ) from e
+                
+            if status_code == 404:
+                raise APIResourceNotFoundError(
+                    message=f"Resource not found: {resource_type or 'Unknown'} {resource_id or ''}",
+                    resource_type=resource_type,
+                    resource_id=resource_id
+                ) from e
+                
+            if status_code == 429:
+                retry_after = e.response.headers.get("Retry-After")
+                if retry_after:
+                    try:
+                        retry_after = int(retry_after)
+                    except ValueError:
+                        retry_after = None
+                        
+                raise APIRateLimitError(
+                    message="Football data API rate limit exceeded",
+                    retry_after=retry_after,
+                    details={"url": str(e.request.url)}
+                ) from e
+                
+            # Generic HTTP error for other status codes
+            raise APIConnectionError(
+                message=f"HTTP {status_code} error",
+                status_code=status_code,
+                details={
+                    "url": str(e.request.url),
+                    "response": e.response.text
+                }
+            ) from e
+            
+    @async_retry(max_retries=3, initial_backoff=1.0, backoff_factor=2.0)
+    async def _make_request(self, method: str, endpoint: str, resource_type: str, resource_id: Optional[str] = None, **kwargs) -> Dict[str, Any]:
+        """Make an API request with proper error handling and retry mechanism.
+        
+        Args:
+            method: HTTP method (get, post, etc.)
+            endpoint: API endpoint URL
+            resource_type: Type of resource being requested (for error reporting)
+            resource_id: ID of the resource (for error reporting)
+            **kwargs: Additional arguments to pass to the httpx request
+            
+        Returns:
+            JSON response data as dictionary
+            
+        Raises:
+            APIConnectionError: For general connection issues
+            APIAuthenticationError: For 401 errors
+            APIResourceNotFoundError: For 404 errors
+            APIRateLimitError: For 429 errors
+        """
+        try:
+            request_method = getattr(self.client, method.lower())
+            response = await request_method(endpoint, **kwargs)
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError as e:
+            await self._handle_request_exception(e, resource_type, resource_id)
     
     async def get_areas(self, area_id=None):
         """Get available areas, optionally filtered by area_id"""
@@ -23,10 +113,13 @@ class FootballAPI:
             endpoint = f"{self.base_url}/areas/{area_id}"
         else:
             endpoint = f"{self.base_url}/areas"
-            
-        response = await self.client.get(endpoint)
-        response.raise_for_status()
-        return response.json()
+        
+        return await self._make_request(
+            "get", 
+            endpoint, 
+            "area", 
+            str(area_id) if area_id else None
+        )
     
     async def get_competitions(self, areas=None):
         """Get available competitions (leagues), optionally filtered by areas"""
@@ -34,15 +127,21 @@ class FootballAPI:
         if areas:
             filters["areas"] = areas
         
-        response = await self.client.get(f"{self.base_url}/competitions", params=filters)
-        response.raise_for_status()
-        return response.json()
+        return await self._make_request(
+            "get", 
+            f"{self.base_url}/competitions", 
+            "competitions",
+            params=filters
+        )
     
     async def get_competition(self, competition_id):
         """Get detailed information about a specific competition"""
-        response = await self.client.get(f"{self.base_url}/competitions/{competition_id}")
-        response.raise_for_status()
-        return response.json()
+        return await self._make_request(
+            "get", 
+            f"{self.base_url}/competitions/{competition_id}", 
+            "competition", 
+            str(competition_id)
+        )
         
     async def get_standings(self, competition_id, season=None, matchday=None, date=None):
         """Get competition standings"""
@@ -54,9 +153,13 @@ class FootballAPI:
         if date:
             filters["date"] = date
             
-        response = await self.client.get(f"{self.base_url}/competitions/{competition_id}/standings", params=filters)
-        response.raise_for_status()
-        return response.json()
+        return await self._make_request(
+            "get",
+            f"{self.base_url}/competitions/{competition_id}/standings",
+            "standings",
+            str(competition_id),
+            params=filters
+        )
     
     async def get_competition_matches(self, competition_id, date_from=None, date_to=None, stage=None, status=None, matchday=None, group=None, season=None):
         """Get matches for a specific competition with optional filters"""
@@ -76,9 +179,13 @@ class FootballAPI:
         if season:
             filters["season"] = season
             
-        response = await self.client.get(f"{self.base_url}/competitions/{competition_id}/matches", params=filters)
-        response.raise_for_status()
-        return response.json()
+        return await self._make_request(
+            "get",
+            f"{self.base_url}/competitions/{competition_id}/matches",
+            "competition_matches",
+            str(competition_id),
+            params=filters
+        )
     
     async def get_competition_teams(self, competition_id, season=None):
         """Get teams for a specific competition"""
@@ -86,9 +193,13 @@ class FootballAPI:
         if season:
             filters["season"] = season
             
-        response = await self.client.get(f"{self.base_url}/competitions/{competition_id}/teams", params=filters)
-        response.raise_for_status()
-        return response.json()
+        return await self._make_request(
+            "get",
+            f"{self.base_url}/competitions/{competition_id}/teams",
+            "competition_teams",
+            str(competition_id),
+            params=filters
+        )
     
     async def get_top_scorers(self, competition_id, limit=10, season=None):
         """Get top scorers for a competition"""
@@ -98,15 +209,22 @@ class FootballAPI:
         if season:
             filters["season"] = season
             
-        response = await self.client.get(f"{self.base_url}/competitions/{competition_id}/scorers", params=filters)
-        response.raise_for_status()
-        return response.json()
+        return await self._make_request(
+            "get",
+            f"{self.base_url}/competitions/{competition_id}/scorers",
+            "top_scorers",
+            str(competition_id),
+            params=filters
+        )
     
     async def get_team(self, team_id):
         """Get detailed information about a team"""
-        response = await self.client.get(f"{self.base_url}/teams/{team_id}")
-        response.raise_for_status()
-        return response.json()
+        return await self._make_request(
+            "get",
+            f"{self.base_url}/teams/{team_id}",
+            "team",
+            str(team_id)
+        )
     
     async def get_team_matches(self, team_id, date_from=None, date_to=None, season=None, competitions=None, status=None, venue=None, limit=None):
         """Get matches for a specific team with optional filters"""
@@ -126,15 +244,22 @@ class FootballAPI:
         if limit:
             filters["limit"] = limit
             
-        response = await self.client.get(f"{self.base_url}/teams/{team_id}/matches", params=filters)
-        response.raise_for_status()
-        return response.json()
+        return await self._make_request(
+            "get",
+            f"{self.base_url}/teams/{team_id}/matches",
+            "team_matches",
+            str(team_id),
+            params=filters
+        )
     
     async def get_person(self, person_id):
         """Get detailed information about a person (player or coach)"""
-        response = await self.client.get(f"{self.base_url}/persons/{person_id}")
-        response.raise_for_status()
-        return response.json()
+        return await self._make_request(
+            "get",
+            f"{self.base_url}/persons/{person_id}",
+            "person",
+            str(person_id)
+        )
     
     async def get_person_matches(self, person_id, date_from=None, date_to=None, status=None, competitions=None, limit=None, offset=None):
         """Get matches for a specific person with optional filters"""
@@ -152,15 +277,22 @@ class FootballAPI:
         if offset:
             filters["offset"] = offset
             
-        response = await self.client.get(f"{self.base_url}/persons/{person_id}/matches", params=filters)
-        response.raise_for_status()
-        return response.json()
+        return await self._make_request(
+            "get",
+            f"{self.base_url}/persons/{person_id}/matches",
+            "person_matches",
+            str(person_id),
+            params=filters
+        )
     
     async def get_match(self, match_id):
         """Get detailed information about a specific match"""
-        response = await self.client.get(f"{self.base_url}/matches/{match_id}")
-        response.raise_for_status()
-        return response.json()
+        return await self._make_request(
+            "get",
+            f"{self.base_url}/matches/{match_id}",
+            "match",
+            str(match_id)
+        )
     
     async def get_matches(self, date_from=date.today(), date_to=None, competitions=None, ids=None, status=None):
         """Get matches across competitions with required date_from parameter"""
@@ -177,9 +309,12 @@ class FootballAPI:
         if status:
             filters["status"] = status
             
-        response = await self.client.get(f"{self.base_url}/matches", params=filters)
-        response.raise_for_status()
-        return response.json()
+        return await self._make_request(
+            "get",
+            f"{self.base_url}/matches",
+            "matches",
+            params=filters
+        )
     
     async def get_head_to_head(self, match_id, limit=10, date_from=None, date_to=None, competitions=None):
         """Get head-to-head matches for teams in a specific match"""
@@ -193,9 +328,13 @@ class FootballAPI:
         if competitions:
             filters["competitions"] = competitions
             
-        response = await self.client.get(f"{self.base_url}/matches/{match_id}/head2head", params=filters)
-        response.raise_for_status()
-        return response.json()
+        return await self._make_request(
+            "get",
+            f"{self.base_url}/matches/{match_id}/head2head",
+            "head_to_head",
+            str(match_id),
+            params=filters
+        )
     
     async def close(self):
         """Close the HTTP client"""
