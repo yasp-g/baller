@@ -2,16 +2,17 @@
 
 ## Progress Summary
 - **Last Updated**: March 24, 2025
-- **Core Infrastructure**: 40% complete (Configuration system, logging)
+- **Core Infrastructure**: 70% complete (Configuration system, logging, testing)
 - **NLP Enhancements**: 0% complete
 - **Football Data Features**: 0% complete
 - **User Experience**: 0% complete
 - **Scalability**: 0% complete
 
 ## Next Steps
-1. Complete error handling (custom exceptions, retry mechanisms)
-2. Add conversation timeout/expiry for memory management
-3. Implement caching for frequently accessed football data
+1. Fix failing tests to ensure full test coverage
+2. Complete error handling (custom exceptions, retry mechanisms)
+3. Add conversation timeout/expiry for memory management
+4. Implement caching for frequently accessed football data
 
 ## 1. Core Infrastructure Improvements
 
@@ -27,10 +28,10 @@
 - ✅ Support different environment configurations (dev, test, prod)
 
 ### 1.3 Testing Infrastructure
-- Implement unit tests with pytest for all components
-- Add mocks for external services (Discord, Football API, LLM)
-- Set up CI pipeline for automated testing
-- Add test coverage reporting
+- ✅ Implement unit tests with pytest for all components
+- ✅ Add mocks for external services (Discord, Football API, LLM)
+- ✅ Set up CI pipeline for automated testing
+- ✅ Add test coverage reporting
 
 ## 2. Natural Language Processing Enhancements
 
