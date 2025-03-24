@@ -45,6 +45,14 @@ class Config:
     # Logging
     LOG_LEVEL = logging.DEBUG if DEBUG else logging.INFO
     
+    # Conversation Management
+    CONVERSATION_EXPIRY_MINUTES = int(get_env("CONVERSATION_EXPIRY_MINUTES", "30"))
+    CONVERSATION_MAX_COUNT = int(get_env("CONVERSATION_MAX_COUNT", "100"))
+    CONVERSATION_RETENTION_DAYS = int(get_env("CONVERSATION_RETENTION_DAYS", "30"))
+    
+    # AWS Integration
+    AWS_ENABLED = get_env("AWS_ENABLED", "false").lower() in ("true", "1", "yes")
+    
     @classmethod
     def validate(cls) -> bool:
         """Validate that all required configuration is present"""
