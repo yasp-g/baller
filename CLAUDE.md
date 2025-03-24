@@ -42,3 +42,19 @@
 ## General Notes
 - **Deployment Infrastructure**: AWS services will be used to deploy and support the application
   - Terraform will be used for managing infrastructure as code
+
+## AWS Integration
+- **Configuration**: Enable AWS integration with `AWS_ENABLED=true` environment variable
+- **DynamoDB Integration**: 
+  - Conversations are stored using user_id as the partition key
+  - Automatic expiry using DynamoDB TTL feature (set with `CONVERSATION_RETENTION_DAYS`)
+  - Serialized data includes conversation history, metadata, and timestamps
+- **Integration Points**:
+  - `src/bot/conversation.py`: Contains AWS integration hooks for conversation storage
+  - `_archive_conversation()`: Archives conversations to DynamoDB (currently placeholder)
+  - `_try_load_from_aws()`: Loads previous conversations from DynamoDB (currently placeholder)
+- **Future Work**:
+  - Implement actual AWS SDK calls (boto3) in the placeholder methods
+  - Add AWS credentials configuration in config.py
+  - Set up CloudWatch metrics for conversation statistics
+  - Implement S3 storage for large conversation contexts

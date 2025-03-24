@@ -93,4 +93,8 @@
 - Containerize application with Docker
 - Set up monitoring and alerting
 - ✅ Implement database for persistent storage (AWS DynamoDB foundation)
+  - Added conversation persistence architecture with DynamoDB integration hooks
+  - Implemented TTL-based expiry mechanism using DynamoDB's TTL feature
+  - Added configuration toggles for AWS integration (AWS_ENABLED env var)
+  - Prepared serialization/deserialization for AWS storage
 - Prepare for multi-instance deployment
