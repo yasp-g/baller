@@ -38,4 +38,20 @@ class BallerBot(commands.Bot):
         # Your existing on_ready method
         logger.info(f"Bot is ready as {self.user.name}#{self.user.discriminator}")
         logger.info(f"Bot user ID: {self.user.id}")
+    
+    async def close(self):
+        """Override close to perform proper shutdown."""
+        logger.info("Bot is shutting down, performing cleanup...")
+        
+        # Properly shut down any cogs with cleanup needs
+        for cog_name, cog in self.cogs.items():
+            if hasattr(cog, 'shutdown'):
+                try:
+                    logger.info(f"Shutting down cog: {cog_name}")
+                    await cog.shutdown()
+                except Exception as e:
+                    logger.error(f"Error shutting down cog {cog_name}: {e}")
+        
+        # Call parent close method
+        await super().close()
         
