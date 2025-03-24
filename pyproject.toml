@@ -13,3 +13,41 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "uvicorn>=0.34.0",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.4",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "respx>=0.20.2",  # For mocking httpx responses
+    "pytest-xdist>=3.5.0",  # For parallel test execution
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["src"]
+omit = ["tests/*", "**/__init__.py"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "pass",
+    "raise ImportError",
+]
+
+[tool.uv.sources]
+baller = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "baller[dev]",
+]

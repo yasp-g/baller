@@ -1,8 +1,9 @@
 # CLAUDE.md - Baller Project Guidelines
 
 ## Build & Test Commands
-- **Run tests**: `uv run python -m tests.test_api` or `uv run python -m tests.test_commands` or `uv run python -m tests.test_llm`
-- **Install dependencies**: `uv install -e .` (project) or `uv add [package]` (single package)
+- **Run tests**: `uv run python -m pytest tests/` or `uv run python -m tests.test_api` or `uv run python -m tests.test_commands` or `uv run python -m tests.test_llm`
+- **Install dependencies**: `uv add --editable .` (project) or `uv add [package]` (single package)
+- **Install dev dependencies**: `uv add --editable --dev ".[dev]"`
 - **Run the app**: `uv run python -m src.main`
 
 ## Code Style Guidelines
@@ -37,3 +38,7 @@
 - **First line**: Maximum 72 characters, no period at end
 - **Body**: Optional, used for explaining complex changes or breaking changes
 - **Pull requests**: Should reference related issues with "Fixes #123" or "Addresses #123"
+
+## General Notes
+- **Deployment Infrastructure**: AWS services will be used to deploy and support the application
+  - Terraform will be used for managing infrastructure as code
