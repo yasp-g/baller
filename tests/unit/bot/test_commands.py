@@ -9,10 +9,12 @@ class TestBallerCommands:
     """Test suite for the BallerCommands class"""
     
     @pytest.fixture
-    def bot_cog(self, mock_discord_bot, mock_football_api, mock_llm_client):
+    def bot_cog(self, mock_discord_bot, mock_football_api, mock_llm_client, mock_preferences_manager):
         """Create a BallerCommands instance with mocked dependencies"""
         with patch("src.bot.commands.FootballAPI", return_value=mock_football_api), \
-             patch("src.bot.commands.LLMClient", return_value=mock_llm_client):
+             patch("src.bot.commands.LLMClient", return_value=mock_llm_client), \
+             patch("src.bot.commands.ConversationManager", return_value=MagicMock()), \
+             patch("src.bot.commands.UserPreferencesManager", return_value=mock_preferences_manager):
             commands = BallerCommands(mock_discord_bot)
             return commands
     
@@ -228,20 +230,29 @@ class TestBallerCommands:
         # First message
         await bot_cog.process_conversation(mock_discord_message, "First question")
         
-        # Check history is created
-        assert user_id in bot_cog.conversation_history
-        assert len(bot_cog.conversation_history[user_id]) == 2  # User message + bot response
-        assert bot_cog.conversation_history[user_id][0]["role"] == "user"
-        assert bot_cog.conversation_history[user_id][0]["content"] == "First question"
-        assert bot_cog.conversation_history[user_id][1]["role"] == "assistant"
-        assert bot_cog.conversation_history[user_id][1]["content"] == "This is a response"
+        # Mock the conversation manager's add_message method to verify it's called correctly
+        bot_cog.conversation_manager.add_message.assert_called()
+        
+        # Verify add_message was called for user message
+        assert bot_cog.conversation_manager.add_message.call_args_list[0][0][0] == user_id
+        assert bot_cog.conversation_manager.add_message.call_args_list[0][0][1] == "user"
+        assert bot_cog.conversation_manager.add_message.call_args_list[0][0][2] == "First question"
+        
+        # Verify add_message was called for assistant response
+        assert bot_cog.conversation_manager.add_message.call_args_list[1][0][0] == user_id
+        assert bot_cog.conversation_manager.add_message.call_args_list[1][0][1] == "assistant"
+        assert bot_cog.conversation_manager.add_message.call_args_list[1][0][2] == "This is a response"
+        
+        # Reset the mock to check second message
+        bot_cog.conversation_manager.add_message.reset_mock()
         
         # Second message
         await bot_cog.process_conversation(mock_discord_message, "Second question")
         
-        # Check history is updated
-        assert len(bot_cog.conversation_history[user_id]) == 4  # Two exchanges
-        assert bot_cog.conversation_history[user_id][2]["content"] == "Second question"
+        # Verify add_message was called again for the second exchange
+        assert bot_cog.conversation_manager.add_message.call_args_list[0][0][0] == user_id
+        assert bot_cog.conversation_manager.add_message.call_args_list[0][0][1] == "user"
+        assert bot_cog.conversation_manager.add_message.call_args_list[0][0][2] == "Second question"
     
     @pytest.fixture
     def team_follow_bot_cog(self, mock_discord_bot, mock_football_api, mock_llm_client, mock_preferences_manager):

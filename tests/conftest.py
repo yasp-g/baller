@@ -11,6 +11,8 @@ os.environ["ENV"] = "test"
 os.environ["DISCORD_TOKEN"] = "test-token"
 os.environ["FOOTBALL_DATA_API_KEY"] = "test-api-key"
 os.environ["DEEPSEEK_API_KEY"] = "test-deepseek-key"
+os.environ["AWS_ENABLED"] = "false"  # Set AWS integration to disabled for tests
+os.environ["CONVERSATION_RETENTION_DAYS"] = "30"  # Set retention days
 
 # Set up logging for tests
 import logging

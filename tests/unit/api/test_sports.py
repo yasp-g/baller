@@ -111,8 +111,10 @@ class TestFootballAPI:
             await api.get_competition(competition_id=999999)
         await api.close()
         
-        # Verify exception contains error details
-        assert "404" in str(exc_info.value)
+        # Verify exception is an APIResourceNotFoundError with correct message
+        from src.exceptions import APIResourceNotFoundError
+        assert isinstance(exc_info.value, APIResourceNotFoundError)
+        assert "Resource not found" in str(exc_info.value)
     
     @respx.mock
     async def test_get_team(self):

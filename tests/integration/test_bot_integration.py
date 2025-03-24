@@ -11,11 +11,12 @@ class TestBotIntegration:
     """Integration tests for the Discord bot with its components"""
     
     @pytest.fixture
-    async def bot_instance(self):
+    async def bot_instance(self, mock_preferences_manager):
         """Create a bot instance with mocked discord client but real components"""
         with patch("discord.ext.commands.Bot.start", AsyncMock()), \
              patch("discord.ext.commands.Bot.add_cog", side_effect=lambda cog: None), \
-             patch.object(discord.ext.commands.Bot, "user", new_callable=PropertyMock) as mock_user_prop:
+             patch.object(discord.ext.commands.Bot, "user", new_callable=PropertyMock) as mock_user_prop, \
+             patch("src.bot.commands.UserPreferencesManager", return_value=mock_preferences_manager):
             
             # Create bot
             bot = BallerBot()
@@ -26,6 +27,10 @@ class TestBotIntegration:
             mock_user.name = "TestBot"
             mock_user.discriminator = "1234"
             mock_user_prop.return_value = mock_user
+            
+            # Mock the loop properly
+            bot.loop = AsyncMock()
+            bot.loop.create_task = MagicMock()
             
             # Allow setup to complete
             await bot.setup_hook()
@@ -119,9 +124,13 @@ class TestBotIntegration:
         # Configure user property for the bot
         mock_bot.user = MagicMock()
         mock_bot.user.id = 123456789
+        mock_bot.loop = MagicMock()
+        mock_bot.loop.create_task = MagicMock()
         
-        # Skip the normal init by creating a mock of the init
-        with patch.object(FootballAPI, "__init__", return_value=None), \
+        # Patch config to include aws_enabled
+        with patch("src.config.config.AWS_ENABLED", False), \
+             patch("src.config.config.CONVERSATION_RETENTION_DAYS", 30), \
+             patch.object(FootballAPI, "__init__", return_value=None), \
              patch.object(LLMClient, "__init__", return_value=None):
              
             # Create the module objects without calling real init
@@ -130,7 +139,9 @@ class TestBotIntegration:
             
             # Patch the API and LLM classes to return our mocks
             with patch("src.bot.commands.FootballAPI", return_value=mock_football_api), \
-                 patch("src.bot.commands.LLMClient", return_value=mock_llm):
+                 patch("src.bot.commands.LLMClient", return_value=mock_llm), \
+                 patch("src.bot.commands.ConversationManager", return_value=MagicMock()), \
+                 patch("src.bot.commands.UserPreferencesManager", return_value=MagicMock()):
                 
                 # Create a bot and commands cog
                 commands_cog = BallerCommands(mock_bot)
