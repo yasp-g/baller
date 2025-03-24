@@ -242,3 +242,126 @@ class TestBallerCommands:
         # Check history is updated
         assert len(bot_cog.conversation_history[user_id]) == 4  # Two exchanges
         assert bot_cog.conversation_history[user_id][2]["content"] == "Second question"
+    
+    @pytest.fixture
+    def team_follow_bot_cog(self, mock_discord_bot, mock_football_api, mock_llm_client, mock_preferences_manager):
+        """Create a BallerCommands instance with mocked dependencies including preferences"""
+        with patch("src.bot.commands.FootballAPI", return_value=mock_football_api), \
+             patch("src.bot.commands.LLMClient", return_value=mock_llm_client), \
+             patch("src.bot.commands.ConversationManager", return_value=MagicMock()), \
+             patch("src.bot.commands.UserPreferencesManager", return_value=mock_preferences_manager):
+            commands = BallerCommands(mock_discord_bot)
+            return commands
+    
+    async def test_follow_team_command(self, team_follow_bot_cog, mock_discord_context):
+        """Test the follow team command"""
+        # Access the actual callback function 
+        callback = team_follow_bot_cog.follow_team.callback
+        
+        # Call the callback with a team name
+        await callback(team_follow_bot_cog, mock_discord_context, team_name="Arsenal")
+        
+        # Verify preferences manager was called
+        assert team_follow_bot_cog.preferences_manager.follow_team.called
+        # Get arguments
+        args = team_follow_bot_cog.preferences_manager.follow_team.call_args[0]
+        user_id = args[0]
+        team_name = args[1]
+        
+        # Verify correct arguments
+        assert user_id == str(mock_discord_context.author.id)
+        assert team_name == "Arsenal"
+        
+        # Verify user was informed
+        assert mock_discord_context.send.called
+        message = mock_discord_context.send.call_args[0][0]
+        assert "You're now following" in message
+        assert "Arsenal" in message
+    
+    async def test_unfollow_team_command(self, team_follow_bot_cog, mock_discord_context):
+        """Test the unfollow team command"""
+        # Access the actual callback function 
+        callback = team_follow_bot_cog.unfollow_team.callback
+        
+        # Call the callback with a team name
+        await callback(team_follow_bot_cog, mock_discord_context, team_name="Chelsea")
+        
+        # Verify preferences manager was called
+        assert team_follow_bot_cog.preferences_manager.unfollow_team.called
+        # Get arguments
+        args = team_follow_bot_cog.preferences_manager.unfollow_team.call_args[0]
+        user_id = args[0]
+        team_name = args[1]
+        
+        # Verify correct arguments
+        assert user_id == str(mock_discord_context.author.id)
+        assert team_name == "Chelsea"
+        
+        # Verify user was informed
+        assert mock_discord_context.send.called
+        message = mock_discord_context.send.call_args[0][0]
+        assert "no longer following" in message
+        assert "Chelsea" in message
+    
+    async def test_my_teams_command(self, team_follow_bot_cog, mock_discord_context):
+        """Test the my teams command"""
+        # Mock get_followed_teams to return some teams
+        team_follow_bot_cog.preferences_manager.get_followed_teams.return_value = {"Liverpool", "Arsenal", "Chelsea"}
+        
+        # Access the actual callback function 
+        callback = team_follow_bot_cog.my_teams.callback
+        
+        # Call the callback
+        await callback(team_follow_bot_cog, mock_discord_context)
+        
+        # Verify preferences manager was called
+        assert team_follow_bot_cog.preferences_manager.get_followed_teams.called
+        # Get arguments
+        args = team_follow_bot_cog.preferences_manager.get_followed_teams.call_args[0]
+        user_id = args[0]
+        
+        # Verify correct arguments
+        assert user_id == str(mock_discord_context.author.id)
+        
+        # Verify user was informed with an embed
+        assert mock_discord_context.send.called
+        # First argument should be an embed
+        kwargs = mock_discord_context.send.call_args[1]
+        assert "embed" in kwargs
+        embed = kwargs["embed"]
+        
+        # Check the embed content
+        assert embed.title == "Your Followed Teams"
+        
+    async def test_matches_with_my_teams_filter(self, team_follow_bot_cog, mock_discord_context, sample_matches_data):
+        """Test the matches command with my teams filter"""
+        # Add a match with one of the user's followed teams
+        arsenal_match = {
+            "id": 123458,
+            "utcDate": "2025-03-30T15:00:00Z",
+            "status": "SCHEDULED",
+            "homeTeam": {"id": 57, "name": "Arsenal"},
+            "awayTeam": {"id": 65, "name": "Manchester City"},
+            "competition": {"name": "Premier League"}
+        }
+        
+        # Update sample_matches_data with a match including followed team
+        sample_matches_data["matches"].append(arsenal_match)
+        
+        # Mock football API and preferences
+        team_follow_bot_cog.football_api.get_matches.return_value = sample_matches_data
+        
+        # Access the actual callback function
+        callback = team_follow_bot_cog.matches.callback
+        
+        # Call with "my" team filter
+        await callback(team_follow_bot_cog, mock_discord_context, team="my")
+        
+        # Verify API was called
+        assert team_follow_bot_cog.football_api.get_matches.called
+        
+        # Verify user preferences were retrieved
+        assert team_follow_bot_cog.preferences_manager.get_user_preferences.called
+        
+        # Verify response included special title for "my teams"
+        assert mock_discord_context.send.called

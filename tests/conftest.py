@@ -54,6 +54,31 @@ def mock_llm_client():
     return llm
 
 @pytest.fixture
+def mock_preferences_manager():
+    """Create a mock UserPreferencesManager instance"""
+    from src.bot.preferences import UserPreferencesManager
+    
+    prefs = MagicMock(spec=UserPreferencesManager)
+    prefs.get_user_preferences = MagicMock()
+    prefs.follow_team = MagicMock()
+    prefs.unfollow_team = MagicMock()
+    prefs.get_followed_teams = MagicMock()
+    prefs.set_notification_setting = MagicMock()
+    prefs.close = AsyncMock()
+    
+    # Set default returns
+    prefs.get_user_preferences.return_value = {
+        "followed_teams": {"Arsenal", "Chelsea"},
+        "notification_settings": {"game_reminders": True, "score_updates": False},
+        "last_updated": 123456789.0
+    }
+    prefs.get_followed_teams.return_value = {"Arsenal", "Chelsea"}
+    prefs.follow_team.return_value = True
+    prefs.unfollow_team.return_value = True
+    
+    return prefs
+
+@pytest.fixture
 def mock_discord_bot():
     """Create a mock Discord Bot instance"""
     from src.bot.client import BallerBot
@@ -65,6 +90,11 @@ def mock_discord_bot():
     bot.user.id = 123456789
     bot.user.name = "TestBot"
     bot.user.discriminator = "1234"
+    
+    # Add event loop for async tasks
+    bot.loop = MagicMock()
+    bot.loop.create_task = MagicMock() 
+    
     return bot
 
 @pytest.fixture

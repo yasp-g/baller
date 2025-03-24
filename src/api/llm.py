@@ -85,12 +85,18 @@ class LLMClient:
         # Keep only the last 5 errors
         self.command_errors = self.command_errors[-5:]
     
-    async def generate_response(self, user_message: str, context_data: Optional[Dict[str, Any]] = None) -> str:
+    async def generate_response(
+        self, 
+        user_message: str, 
+        context_data: Optional[Dict[str, Any]] = None,
+        user_preferences: Optional[Dict[str, Any]] = None
+    ) -> str:
         """Generate a conversational response using Deepseek's model
         
         Args:
             user_message: The user's question or message
             context_data: Optional context data to include in the prompt
+            user_preferences: Optional user preferences to personalize the response
             
         Returns:
             Generated text response from the LLM
@@ -106,6 +112,7 @@ class LLMClient:
         # Create the system prompt with error context if available
         api_context = ""
         cmd_context = ""
+        user_pref_context = ""
         
         # Add API information if available
         if self.football_api:
@@ -123,6 +130,19 @@ class LLMClient:
                 for err in self.command_errors:
                     cmd_context += f"\n- {err['command'] or 'Unknown command'}: {err['message']}"
         
+        # Add user preferences if available
+        if user_preferences:
+            followed_teams = user_preferences.get("followed_teams", set())
+            if followed_teams:
+                teams_list = ", ".join(sorted(followed_teams))
+                user_pref_context = f"This user follows these teams: {teams_list}. Prioritize information about these teams when relevant."
+                
+            notification_settings = user_preferences.get("notification_settings", {})
+            if notification_settings:
+                user_pref_context += "\nThe user's notification preferences are:"
+                for setting, value in notification_settings.items():
+                    user_pref_context += f"\n- {setting}: {'Enabled' if value else 'Disabled'}"
+        
         system_prompt = f"""
         You are a helpful football assistant. You have access to football data
         provided by football-data API. Respond conversationally to user queries about football matches,
@@ -131,6 +151,8 @@ class LLMClient:
         {api_context}
         
         {cmd_context}
+        
+        {user_pref_context}
         """
         
         # Format context data for the LLM

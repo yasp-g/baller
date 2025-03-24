@@ -5,14 +5,15 @@
 - **Core Infrastructure**: 92% complete (Configuration system, logging, testing, error handling, memory management)
 - **NLP Enhancements**: 15% complete (Conversation management)
 - **Football Data Features**: 0% complete
-- **User Experience**: 0% complete
+- **User Experience**: 25% complete (User preferences, team following)
 - **Scalability**: 10% complete (AWS integration foundation)
 
 ## Next Steps
 1. ✅ Fix failing tests to ensure full test coverage 
 2. ✅ Complete error handling (custom exceptions, retry mechanisms)
 3. ✅ Add conversation timeout/expiry for memory management
-4. Implement caching for frequently accessed football data
+4. ✅ Add user preferences and team following
+5. Implement caching for frequently accessed football data
 
 ## 1. Core Infrastructure Improvements
 
@@ -45,7 +46,7 @@
 - ✅ Improve conversation history management with proper state tracking
 - ✅ Add timeout/expiry for old conversations to manage memory
 - Implement conversation context summarization for long interactions
-- Support user preferences and personalization
+- ✅ Support user preferences and personalization
 
 ### 2.3 LLM Integration
 - Standardize prompt templates across different providers
@@ -76,7 +77,11 @@
 - Implement help system with examples and guided flows
 
 ### 4.2 Personalization
-- Allow users to set favorite teams and competitions
+- ✅ Allow users to set favorite teams and competitions
+  - Implemented team following via `!follow` and `!unfollow` commands
+  - Added team preferences storage with AWS integration architecture
+  - Enhanced `!matches` command to support filtering by followed teams
+  - Added notification preference settings for future game reminders
 - Implement notification system for match events
 - Support customization of data presentation
 - Add user-specific command shortcuts
@@ -97,4 +102,6 @@
   - Implemented TTL-based expiry mechanism using DynamoDB's TTL feature
   - Added configuration toggles for AWS integration (AWS_ENABLED env var)
   - Prepared serialization/deserialization for AWS storage
+  - Extended AWS integration for user preferences storage
+  - Designed unified DynamoDB schema with prefixes for different data types
 - Prepare for multi-instance deployment

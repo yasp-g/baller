@@ -8,6 +8,7 @@ from ..api.llm import LLMClient
 from datetime import datetime, date, timedelta
 from ..config import config
 from .conversation import ConversationManager
+from .preferences import UserPreferencesManager
 from ..exceptions import (
     BallerException,
     APIException,
@@ -25,6 +26,7 @@ class BallerCommands(commands.Cog):
         self.football_api = FootballAPI()
         self.llm_client = LLMClient()
         self.conversation_manager = ConversationManager()
+        self.preferences_manager = UserPreferencesManager(config)
 
         logger.info(f"BallerCommands initialized with bot ID: {self.bot.user.id if self.bot.user else 'Not available yet'}")
         
@@ -95,6 +97,10 @@ class BallerCommands(commands.Cog):
         
         # Add user message to conversation history
         self.conversation_manager.add_message(user_id, "user", content)
+        
+        # Get user preferences
+        user_prefs = self.preferences_manager.get_user_preferences(user_id)
+        followed_teams = user_prefs.get("followed_teams", set())
         
         # Analyze the message to determine what football data we need
         relevant_data = None
@@ -213,7 +219,11 @@ class BallerCommands(commands.Cog):
             # Generate response using the LLM
             logger.info("Generating response using LLM")
             try:
-                response = await self.llm_client.generate_response(content, relevant_data)
+                response = await self.llm_client.generate_response(
+                    content, 
+                    relevant_data,
+                    user_preferences=user_prefs
+                )
                 logger.debug(f"LLM response generated: {response[:50]}...")
             except LLMException as e:
                 logger.error(f"LLM error: {e}")
@@ -391,12 +401,22 @@ class BallerCommands(commands.Cog):
             await ctx.send("Error retrieving conversation statistics")
     
     @commands.command(name="matches")
-    async def matches(self, ctx, competition_id: int = None, days: int = 7):
-        """Get upcoming matches, optionally filtered by competition ID"""
+    async def matches(self, ctx, competition_id: int = None, days: int = 7, team: str = None):
+        """Get upcoming matches, optionally filtered by competition ID or team
+        
+        Use 'my' as the team parameter to show only matches for your followed teams
+        """
         try:
             today = date.today()
             end_date = today + timedelta(days=days)
+            user_id = str(ctx.author.id)
             
+            # Fetch user preferences for all cases
+            user_prefs = self.preferences_manager.get_user_preferences(user_id)
+            followed_teams = user_prefs.get("followed_teams", set())
+            followed_teams_lower = {t.lower() for t in followed_teams} if followed_teams else set()
+            
+            # Get matches data
             if competition_id:
                 matches = await self.football_api.get_competition_matches(
                     competition_id=competition_id,
@@ -410,12 +430,52 @@ class BallerCommands(commands.Cog):
                     date_to=end_date,
                     status="SCHEDULED"
                 )
+                
+            # Check if we should filter by user's followed teams
+            if team and team.lower() == "my":
+                if not followed_teams:
+                    await ctx.send("You're not following any teams yet. Use `!follow <team name>` to start following a team.")
+                    return
             
             match_list = matches.get("matches", [])
             
             if not match_list:
                 await ctx.send("No upcoming matches found for this period.")
                 return
+                
+            # Filter by teams if requested
+            if team:
+                filtered_matches = []
+                
+                if team.lower() == "my":
+                    # Filter by user's followed teams
+                    for match in match_list:
+                        home_team = match.get("homeTeam", {}).get("name", "").lower()
+                        away_team = match.get("awayTeam", {}).get("name", "").lower()
+                        
+                        # Check if either team is followed (case-insensitive)
+                        if home_team in followed_teams_lower or away_team in followed_teams_lower:
+                            filtered_matches.append(match)
+                    
+                    if not filtered_matches:
+                        await ctx.send("No upcoming matches found for your followed teams in this period.")
+                        return
+                else:
+                    # Filter by specific team name
+                    team_name_lower = team.lower()
+                    for match in match_list:
+                        home_team = match.get("homeTeam", {}).get("name", "").lower()
+                        away_team = match.get("awayTeam", {}).get("name", "").lower()
+                        
+                        # Check if either team matches the provided name (case-insensitive)
+                        if team_name_lower in home_team or team_name_lower in away_team:
+                            filtered_matches.append(match)
+                    
+                    if not filtered_matches:
+                        await ctx.send(f"No upcoming matches found for teams matching '{team}' in this period.")
+                        return
+                
+                match_list = filtered_matches
             
             # Group matches by date
             matches_by_date = {}
@@ -441,10 +501,19 @@ class BallerCommands(commands.Cog):
                     color=discord.Color.blue()
                 )
                 
-                # Add competition name to title if filtering
+                # Add competition name to title if filtering by competition
                 if competition_id:
                     comp_name = day_matches[0].get("competition", {}).get("name", "")
                     embed.title = f"{comp_name} Matches for {nice_date}"
+                    
+                # Update title based on team filtering
+                if team:
+                    if team.lower() == "my":
+                        embed.title = f"Your Teams' Matches for {nice_date}"
+                        embed.color = discord.Color.green()  # Use a different color for personalized content
+                    else:
+                        embed.title = f"Matches for {team} on {nice_date}"
+                        embed.color = discord.Color.gold()  # Use a different color for team filtering
                 
                 # Add up to 25 matches (Discord field limit)
                 for match in day_matches[:25]:
@@ -459,8 +528,18 @@ class BallerCommands(commands.Cog):
                             time = time.split("T")[1][:5] if "T" in time else ""
                     
                     comp = match.get("competition", {}).get("name", "")
+                    match_title = f"{home} vs {away}"
+                    
+                    # Highlight followed teams with stars if showing all matches 
+                    # (no need if already filtered to just followed teams)
+                    if team is None and 'followed_teams_lower' in locals():
+                        if home.lower() in followed_teams_lower:
+                            match_title = f"⭐ {home} vs {away}"
+                        elif away.lower() in followed_teams_lower:
+                            match_title = f"{home} vs ⭐ {away}"
+                    
                     embed.add_field(
-                        name=f"{home} vs {away}",
+                        name=match_title,
                         value=f"🕒 {time}" + (f" | 🏆 {comp}" if not competition_id else ""),
                         inline=False
                     )
@@ -471,6 +550,160 @@ class BallerCommands(commands.Cog):
             self.llm_client.record_command_error(e, command=f"standings {competition_id}")
             await ctx.send(f"Sorry, I couldn't retrieve the standings: {str(e)}")
             
+    @commands.command(name="follow")
+    async def follow_team(self, ctx, *, team_name):
+        """Follow a team to get updates and customize responses"""
+        user_id = str(ctx.author.id)
+        
+        try:
+            # Add the team to user's followed list
+            result = self.preferences_manager.follow_team(user_id, team_name)
+            
+            if result:
+                await ctx.send(f"✅ You're now following **{team_name}**! You'll get customized responses and updates about this team.")
+            else:
+                await ctx.send(f"ℹ️ You're already following **{team_name}**.")
+                
+        except ValidationError as e:
+            self.llm_client.record_command_error(e, command="follow")
+            await ctx.send(f"⚠️ {e.message}")
+            
+        except Exception as e:
+            logger.error(f"Error following team: {e}")
+            error = CommandError(
+                message=f"Unexpected error following team: {str(e)}",
+                command_name="follow",
+                details={"team_name": team_name}
+            )
+            self.llm_client.record_command_error(error, command="follow")
+            await ctx.send(f"Sorry, I couldn't follow that team: {error.message}")
+    
+    @commands.command(name="unfollow")
+    async def unfollow_team(self, ctx, *, team_name):
+        """Unfollow a team"""
+        user_id = str(ctx.author.id)
+        
+        try:
+            # Remove the team from user's followed list
+            result = self.preferences_manager.unfollow_team(user_id, team_name)
+            
+            if result:
+                await ctx.send(f"✅ You're no longer following **{team_name}**.")
+            else:
+                await ctx.send(f"ℹ️ You weren't following **{team_name}**.")
+                
+        except ValidationError as e:
+            self.llm_client.record_command_error(e, command="unfollow")
+            await ctx.send(f"⚠️ {e.message}")
+            
+        except Exception as e:
+            logger.error(f"Error unfollowing team: {e}")
+            error = CommandError(
+                message=f"Unexpected error unfollowing team: {str(e)}",
+                command_name="unfollow",
+                details={"team_name": team_name}
+            )
+            self.llm_client.record_command_error(error, command="unfollow")
+            await ctx.send(f"Sorry, I couldn't unfollow that team: {error.message}")
+    
+    @commands.command(name="myteams")
+    async def my_teams(self, ctx):
+        """List all teams you're currently following"""
+        user_id = str(ctx.author.id)
+        
+        try:
+            # Get the user's followed teams
+            teams = self.preferences_manager.get_followed_teams(user_id)
+            
+            if not teams:
+                await ctx.send("You're not following any teams yet. Use `!follow <team name>` to start following a team.")
+                return
+                
+            # Create an embed to display the teams
+            embed = discord.Embed(
+                title="Your Followed Teams",
+                description="Teams you're currently following:",
+                color=discord.Color.blue()
+            )
+            
+            # Add each team to the embed
+            for team in sorted(teams):
+                embed.add_field(name=team, value="Use `!matches` to see upcoming games", inline=True)
+                
+            embed.set_footer(text="To unfollow a team, use !unfollow <team name>")
+            
+            await ctx.send(embed=embed)
+                
+        except Exception as e:
+            logger.error(f"Error listing teams: {e}")
+            error = CommandError(
+                message=f"Unexpected error listing followed teams: {str(e)}",
+                command_name="myteams"
+            )
+            self.llm_client.record_command_error(error, command="myteams")
+            await ctx.send(f"Sorry, I couldn't list your followed teams: {error.message}")
+    
+    @commands.command(name="preferences")
+    async def preferences(self, ctx, setting=None, value=None):
+        """View or update your notification preferences"""
+        user_id = str(ctx.author.id)
+        
+        if not setting:
+            # Display current preferences
+            prefs = self.preferences_manager.get_user_preferences(user_id)
+            
+            embed = discord.Embed(
+                title="Your Preferences",
+                color=discord.Color.blue()
+            )
+            
+            # Show followed teams
+            teams = prefs.get("followed_teams", set())
+            teams_str = ", ".join(sorted(teams)) if teams else "None"
+            embed.add_field(
+                name="Followed Teams",
+                value=teams_str,
+                inline=False
+            )
+            
+            # Show notification settings
+            notifications = prefs.get("notification_settings", {})
+            embed.add_field(
+                name="Game Reminders",
+                value="Enabled" if notifications.get("game_reminders", False) else "Disabled",
+                inline=True
+            )
+            
+            embed.add_field(
+                name="Score Updates",
+                value="Enabled" if notifications.get("score_updates", False) else "Disabled",
+                inline=True
+            )
+            
+            embed.set_footer(text="Use !preferences <setting> <on/off> to change settings")
+            
+            await ctx.send(embed=embed)
+            return
+            
+        # Update a specific preference
+        if setting.lower() not in ["game_reminders", "score_updates"]:
+            await ctx.send("⚠️ Unknown preference setting. Available settings: game_reminders, score_updates")
+            return
+            
+        if not value or value.lower() not in ["on", "off", "true", "false"]:
+            await ctx.send("⚠️ Please specify 'on' or 'off' for the setting value.")
+            return
+            
+        # Convert value to boolean
+        bool_value = value.lower() in ["on", "true"]
+        
+        try:
+            self.preferences_manager.set_notification_setting(user_id, setting.lower(), bool_value)
+            await ctx.send(f"✅ Your preference for **{setting}** has been set to **{'on' if bool_value else 'off'}**.")
+        except Exception as e:
+            logger.error(f"Error updating preference: {e}")
+            await ctx.send(f"Sorry, I couldn't update your preference: {str(e)}")
+    
     async def shutdown(self):
         """Clean up resources when shutting down."""
         logger.info("BallerCommands shutting down...")
@@ -481,6 +714,13 @@ class BallerCommands(commands.Cog):
             logger.info("Conversation manager shut down successfully")
         except Exception as e:
             logger.error(f"Error shutting down conversation manager: {e}")
+        
+        # Shut down the preferences manager
+        try:
+            await self.preferences_manager.close()
+            logger.info("Preferences manager shut down successfully")
+        except Exception as e:
+            logger.error(f"Error shutting down preferences manager: {e}")
         
         # Close the football API client
         try:
