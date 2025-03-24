@@ -1,10 +1,9 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 import discord
 from src.bot.client import BallerBot
 from src.config import config
 
-@pytest.mark.asyncio
 class TestBallerBot:
     """Test suite for the BallerBot class"""
     
@@ -26,21 +25,36 @@ class TestBallerBot:
         assert intents.message_content is True
         assert intents.members is True
     
-    @patch("discord.ext.commands.Bot.add_cog")
-    @patch("src.bot.client.BallerCommands")
-    async def test_setup_hook(self, mock_commands, mock_add_cog):
+    @pytest.mark.asyncio
+    async def test_setup_hook(self):
         """Test the setup_hook method loads the correct cogs"""
-        # Create a bot with mocked methods
-        bot = BallerBot()
-        bot.user = MagicMock()
-        
-        # Call setup_hook
-        await bot.setup_hook()
-        
-        # Verify BallerCommands cog was created and added
-        assert mock_commands.called
-        assert mock_add_cog.called
+        # Create mocks for the required components
+        with patch("src.bot.commands.BallerCommands", autospec=True) as mock_commands_class, \
+             patch.object(discord.ext.commands.Bot, "add_cog", autospec=True) as mock_add_cog:
+            
+            # Create mock bot - we need to patch the init and user property
+            with patch.object(discord.ext.commands.Bot, "__init__", return_value=None):
+                bot = BallerBot()
+                
+                # Mock the user property
+                mock_user = MagicMock()
+                mock_user.name = "TestBot"
+                
+                # Use a property mock to allow setting user
+                with patch.object(discord.ext.commands.Bot, "user", new_callable=PropertyMock) as mock_user_prop:
+                    mock_user_prop.return_value = mock_user
+                    
+                    # Create a mock command instance
+                    mock_commands_instance = MagicMock()
+                    mock_commands_class.return_value = mock_commands_instance
+                    
+                    # Call setup_hook
+                    await bot.setup_hook()
+                    
+                    # Verify the cog was added
+                    assert mock_add_cog.called
     
+    @pytest.mark.asyncio
     @patch("discord.ext.commands.Bot.start")
     async def test_start_bot(self, mock_start):
         """Test the start_bot method"""
@@ -57,6 +71,7 @@ class TestBallerBot:
             assert mock_start.called
             assert mock_start.call_args[0][0] == test_token
     
+    @pytest.mark.asyncio
     @patch("discord.ext.commands.Bot.start")
     async def test_start_bot_error(self, mock_start):
         """Test error handling in start_bot method"""
@@ -73,16 +88,35 @@ class TestBallerBot:
         # Check exception is propagated
         assert "Invalid token" in str(exc_info.value)
     
+    @pytest.mark.asyncio
     async def test_on_ready(self):
         """Test the on_ready event handler"""
-        # Create a bot with a mock user
-        bot = BallerBot()
-        bot.user = MagicMock()
-        bot.user.name = "TestBot"
-        bot.user.discriminator = "1234"
-        bot.user.id = 123456789
-        
-        # Call the on_ready method
-        await bot.on_ready()
-        
-        # No assertions needed - this just tests that the method runs without errors
+        # Set up mocks for the bot and its user attribute
+        with patch.object(discord.ext.commands.Bot, "__init__", return_value=None), \
+             patch("src.bot.client.logger") as mock_logger:
+             
+            # Create the bot
+            bot = BallerBot()
+            
+            # Create a mock user that can be accessed via properties
+            mock_user = MagicMock()
+            mock_user.name = "TestBot"
+            mock_user.discriminator = "1234"
+            mock_user.id = 123456789
+            
+            # Patch the user property to return our mock
+            with patch.object(discord.ext.commands.Bot, "user", new_callable=PropertyMock) as mock_user_prop:
+                mock_user_prop.return_value = mock_user
+                
+                # Call on_ready
+                await bot.on_ready()
+                
+                # Verify logger was called with correct information
+                assert mock_logger.info.called
+                
+                # Collect all log messages
+                log_calls = [call[0][0] for call in mock_logger.info.call_args_list]
+                
+                # Check for expected content in log messages
+                assert any("TestBot#1234" in call for call in log_calls)
+                assert any("123456789" in call for call in log_calls)
