@@ -1,16 +1,21 @@
 import httpx
+import logging
 from datetime import date
-# from ..config import API_SPORTS_KEY, API_SPORTS_BASE_URL
-from ..config import FOOTBALL_DATA_API_KEY
+from ..config import config
 
 # Football-data API
 class FootballAPI:
     def __init__(self):
-        self.base_url = "https://api.football-data.org/v4"
+        self.logger = logging.getLogger('baller.api.sports')
+        self.base_url = config.FOOTBALL_DATA_BASE_URL
         self.headers = {
-            "X-Auth-Token": FOOTBALL_DATA_API_KEY,
+            "X-Auth-Token": config.FOOTBALL_DATA_API_KEY,
         }
-        self.client = httpx.AsyncClient(headers=self.headers)
+        self.client = httpx.AsyncClient(
+            headers=self.headers,
+            timeout=10.0 
+        )
+        self.logger.debug("FootballAPI initialized")
     
     async def get_areas(self, area_id=None):
         """Get available areas, optionally filtered by area_id"""

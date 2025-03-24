@@ -1,14 +1,21 @@
+import logging
 import discord
 from discord.ext import commands
 from ..api.sports import FootballAPI
 from ..api.llm import LLMClient
 from datetime import datetime, date, timedelta
+from ..config import config
+
+# Get logger for this module
+logger = logging.getLogger('baller.commands')
 
 class BallerCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.football_api = FootballAPI()
         self.llm_client = LLMClient()
+
+        logger.info(f"BallerCommands initialized with bot ID: {self.bot.user.id if self.bot.user else 'Not available yet'}")
         
         # Register components with LLMClient for error handling
         self.llm_client.register_api(self.football_api)
@@ -20,27 +27,57 @@ class BallerCommands(commands.Cog):
     async def on_message(self, message):
         # Ignore messages from the bot itself
         if message.author == self.bot.user:
+            logger.debug(f"Ignoring message from self: {message.content[:30]}...")
             return
         
+        logger.debug(f"Received message: '{message.content}' from {message.author}")
+        logger.debug(f"Channel type: {type(message.channel)}, Is DM: {isinstance(message.channel, discord.DMChannel)}")
+
         # Check if the message is in a DM or mentions the bot
         is_dm = isinstance(message.channel, discord.DMChannel)
         is_mention = self.bot.user in message.mentions
+
+        logger.info(f"Message analysis - Is DM: {is_dm}, Is mention: {is_mention}")
+        logger.debug(f"Bot mentions in message: {[m.id for m in message.mentions if m.bot]}")
+        logger.debug(f"Bot user ID: {self.bot.user.id}")
         
         if is_dm or is_mention:
+            logger.info(f"Processing conversational message: {message.content[:50]}...")
+            
             # Remove the mention from the message content if present
             content = message.content
             if is_mention:
-                content = content.replace(f'<@{self.bot.user.id}>', '').strip()
+                # Log the original content and the bot's user ID format
+                logger.debug(f"Original content: {content}")
+                logger.debug(f"Removing mention format: <@{self.bot.user.id}>")
+                
+                # Try different mention formats
+                mention_formats = [
+                    f'<@{self.bot.user.id}>',  # Standard mention
+                    f'<@!{self.bot.user.id}>'  # Nickname mention
+                ]
+                
+                for mention_format in mention_formats:
+                    if mention_format in content:
+                        logger.debug(f"Found mention format: {mention_format}")
+                        content = content.replace(mention_format, '').strip()
+                        break
+                
+                logger.debug(f"Content after mention removal: {content}")
             
             # Process the user's message
             await self.process_conversation(message, content)
+        else:
+            logger.debug(f"Ignoring non-conversational message: {message.content[:30]}...")
     
     async def process_conversation(self, message, content):
         """Process a conversational message using the LLM and football-data API"""
         user_id = str(message.author.id)
+        logger.info(f"Processing conversation for user {user_id} with content: {content[:50]}...")
         
         # Initialize conversation history for this user if it doesn't exist
         if user_id not in self.conversation_history:
+            logger.debug(f"Initializing new conversation history for user {user_id}")
             self.conversation_history[user_id] = []
         
         # Add user message to history
@@ -48,33 +85,61 @@ class BallerCommands(commands.Cog):
         
         # Analyze the message to determine what football data we need
         relevant_data = None
+        logger.debug(f"Analyzing message for football data keywords")
         
         if "standing" in content.lower() or "table" in content.lower():
+            logger.debug("Found standing/table keyword")
             # Premier League standings (competition ID 2021 is Premier League)
             if "premier" in content.lower() or "epl" in content.lower():
-                standings = await self.football_api.get_standings(competition_id=2021)
-                relevant_data = standings
+                logger.info("Fetching Premier League standings")
+                try:
+                    standings = await self.football_api.get_standings(competition_id=2021)
+                    relevant_data = standings
+                    logger.debug("Premier League standings fetched successfully")
+                except Exception as e:
+                    logger.error(f"Error fetching Premier League standings: {e}")
             # Bundesliga standings (competition ID 2002)
             elif "bundesliga" in content.lower():
-                standings = await self.football_api.get_standings(competition_id=2002)
-                relevant_data = standings
+                logger.info("Fetching Bundesliga standings")
+                try:
+                    standings = await self.football_api.get_standings(competition_id=2002)
+                    relevant_data = standings
+                    logger.debug("Bundesliga standings fetched successfully")
+                except Exception as e:
+                    logger.error(f"Error fetching Bundesliga standings: {e}")
             # La Liga standings (competition ID 2014)
             elif "la liga" in content.lower() or "laliga" in content.lower():
-                standings = await self.football_api.get_standings(competition_id=2014)
-                relevant_data = standings
+                logger.info("Fetching La Liga standings")
+                try:
+                    standings = await self.football_api.get_standings(competition_id=2014)
+                    relevant_data = standings
+                    logger.debug("La Liga standings fetched successfully")
+                except Exception as e:
+                    logger.error(f"Error fetching La Liga standings: {e}")
 
         elif "match" in content.lower() or "game" in content.lower() or "fixture" in content.lower():
+            logger.debug("Found match/game/fixture keyword")
             today = date.today()
             
             # Get today's matches
             if "today" in content.lower():
-                matches = await self.football_api.get_matches(date_from=today, date_to=today)
-                relevant_data = matches
+                logger.info(f"Fetching today's matches ({today})")
+                try:
+                    matches = await self.football_api.get_matches(date_from=today, date_to=today)
+                    relevant_data = matches
+                    logger.debug("Today's matches fetched successfully")
+                except Exception as e:
+                    logger.error(f"Error fetching today's matchess: {e}")
             # Get tomorrow's matches
             elif "tomorrow" in content.lower():
                 tomorrow = today + timedelta(days=1)
-                matches = await self.football_api.get_matches(date_from=tomorrow, date_to=tomorrow)
-                relevant_data = matches
+                logger.info(f"Fetching tomorrow's matches ({tomorrow})")
+                try:
+                    matches = await self.football_api.get_matches(date_from=tomorrow, date_to=tomorrow)
+                    relevant_data = matches
+                    logger.debug("Tomorrows's matches fetched successfully")
+                except Exception as e:
+                    logger.error(f"Error fetching tomorrow's matchess: {e}")
             # Get weekend matches
             elif "weekend" in content.lower():
                 # Calculate the next weekend (Sat-Sun)
@@ -84,13 +149,23 @@ class BallerCommands(commands.Cog):
                 else:
                     saturday = today + timedelta(days=days_until_saturday)
                 sunday = saturday + timedelta(days=1)
-                matches = await self.football_api.get_matches(date_from=saturday, date_to=sunday)
-                relevant_data = matches
+                logger.info(f"Fetching weekend matches (from {saturday} to {sunday})")
+                try:
+                    matches = await self.football_api.get_matches(date_from=saturday, date_to=sunday)
+                    relevant_data = matches
+                    logger.debug("Fetching this weekend's matches")
+                except Exception as e:
+                    logger.error(f"Error fetching this weekend's matches: {e}")
             # Default to next 7 days
             else:
                 next_week = today + timedelta(days=7)
-                matches = await self.football_api.get_matches(date_from=today, date_to=next_week)
-                relevant_data = matches
+                logger.info(f"Fetching matches for the next 7 days (until {next_week})")
+                try:
+                    matches = await self.football_api.get_matches(date_from=today, date_to=next_week)
+                    relevant_data = matches
+                    logger.debug("Next 7 days' matches fetched successfully")
+                except Exception as e:
+                    logger.error(f"Error fetching next 7 days' matches: {e}")
             
             # Filter by competition if mentioned
             if "premier" in content.lower() or "epl" in content.lower() and relevant_data:
@@ -106,14 +181,29 @@ class BallerCommands(commands.Cog):
                         )
                         relevant_data = matches
         
+        logger.info(f"Relevant data type retrieved: {type(relevant_data).__name__ if relevant_data else 'None'}")
+        if relevant_data:
+            logger.debug(f"Data keys: {relevant_data.keys() if hasattr(relevant_data, 'keys') else 'No keys'}")
+
         # Generate response using the LLM
-        response = await self.llm_client.generate_response(content, relevant_data)
+        logger.info("Generating response using LLM")
+        try:
+            response = await self.llm_client.generate_response(content, relevant_data)
+            logger.debug(f"LLM response generated: {response[:50]}...")
+        except Exception as e:
+            logger.error(f"Error generating LLM response: {e}")
+            response = f"Sorry, I encountered an error: {str(e)}"
         
         # Add bot response to history
         self.conversation_history[user_id].append({"role": "assistant", "content": response})
         
         # Send the response
-        await message.channel.send(response)
+        logger.info(f"Sending response to channel {message.channel.id}")
+        try:
+            await message.channel.send(response)
+            logger.debug("Response sent successfully")
+        except Exception as e:
+            logger.error(f"Error sending response: {e}")
     
     @commands.command(name="competitions")
     async def competitions(self, ctx, area=None):

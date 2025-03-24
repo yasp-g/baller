@@ -1,8 +1,9 @@
 import os
 import inspect
+import logging
 import anthropic
 from openai import AsyncOpenAI
-from ..config import ANTHROPIC_API_KEY, DEEPSEEK_API_KEY
+from ..config import config
 
 # class LLMClient:
 #     def __init__(self):
@@ -38,14 +39,16 @@ from ..config import ANTHROPIC_API_KEY, DEEPSEEK_API_KEY
 
 class LLMClient:
     def __init__(self):
+        self.logger = logging.getLogger('baller.api.llm')
         self.client = AsyncOpenAI(
-            api_key=DEEPSEEK_API_KEY,
-            base_url="https://api.deepseek.com"  # Deepseek API endpoint
+            api_key=config.DEEPSEEK_API_KEY,
+            base_url=config.DEEPSEEK_BASE_URL
         )
         self.football_api = None
         self.commands = None
         self.api_errors = []
         self.command_errors = []
+        self.logger.debug("LLMClient initialized")
     
     def register_api(self, api):
         """Register the FootballAPI instance"""
