@@ -1,18 +1,71 @@
 import os
+import logging
 from dotenv import load_dotenv
+from typing import Dict, Any, Optional
 
 # Load environment variables
 load_dotenv()
 
-# Discord configuration
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-DISCORD_GUILD_ID = os.getenv("DISCORD_GUILD_ID")
+def get_env(key: str, default: Optional[str] = None, required: bool = False) -> str:
+    """Get environment variable with validation"""
+    value = os.getenv(key, default)
+    if required and not value:
+        raise ValueError(f"Required environment variable {key} is not set")
+    return value
 
-# API-Sports configuration
-# API_SPORTS_KEY = os.getenv("API_SPORTS_KEY")
-# API_SPORTS_BASE_URL = os.getenv("API_SPORTS_BASE_URL")
-FOOTBALL_DATA_API_KEY = os.getenv("FOOTBALL_DATA_API_KEY")
+class Config:
+    """Centralized configuration with validation"""
+    
+    # Environment
+    ENV = get_env("ENV", "development")
+    DEBUG = ENV == "development"
+    
+    # Discord configuration
+    DISCORD_TOKEN = get_env("DISCORD_TOKEN", required=True)
+    DISCORD_GUILD_ID = get_env("DISCORD_GUILD_ID")
+    
+    # Football Data API
+    FOOTBALL_DATA_API_KEY = get_env("FOOTBALL_DATA_API_KEY", required=True)
+    FOOTBALL_DATA_BASE_URL = "https://api.football-data.org/v4"
+    
+    # LLM Configuration
+    DEEPSEEK_API_KEY = get_env("DEEPSEEK_API_KEY", required=True)
+    DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+    ANTHROPIC_API_KEY = get_env("ANTHROPIC_API_KEY")  # Kept for backwards compatibility
+    
+    # Competition IDs for common leagues
+    COMPETITIONS = {
+        "premier_league": 2021,
+        "la_liga": 2014,
+        "bundesliga": 2002,
+        "serie_a": 2019,
+        "ligue_1": 2015
+    }
+    
+    # Logging
+    LOG_LEVEL = logging.DEBUG if DEBUG else logging.INFO
+    
+    @classmethod
+    def validate(cls) -> bool:
+        """Validate that all required configuration is present"""
+        required_keys = [
+            cls.DISCORD_TOKEN,
+            cls.FOOTBALL_DATA_API_KEY,
+            cls.DEEPSEEK_API_KEY
+        ]
+        
+        # Verify all required values are present
+        for key in required_keys:
+            if not key:
+                return False
+        return True
 
-# LLM configuration
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY")
+# Initialize configuration at import time
+config = Config()
+
+# For backwards compatibility
+DISCORD_TOKEN = config.DISCORD_TOKEN
+DISCORD_GUILD_ID = config.DISCORD_GUILD_ID
+FOOTBALL_DATA_API_KEY = config.FOOTBALL_DATA_API_KEY
+DEEPSEEK_API_KEY = config.DEEPSEEK_API_KEY
+ANTHROPIC_API_KEY = config.ANTHROPIC_API_KEY
