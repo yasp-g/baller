@@ -3,7 +3,14 @@ import inspect
 import logging
 import anthropic
 from openai import AsyncOpenAI
+from typing import Dict, Any, Optional, List
 from ..config import config
+from ..exceptions import (
+    LLMException,
+    ModelUnavailableError,
+    PromptError,
+    ResponseError
+)
 
 # class LLMClient:
 #     def __init__(self):
@@ -78,9 +85,24 @@ class LLMClient:
         # Keep only the last 5 errors
         self.command_errors = self.command_errors[-5:]
     
-    async def generate_response(self, user_message, context_data=None):
-        """Generate a conversational response using Deepseek's model"""
+    async def generate_response(self, user_message: str, context_data: Optional[Dict[str, Any]] = None) -> str:
+        """Generate a conversational response using Deepseek's model
         
+        Args:
+            user_message: The user's question or message
+            context_data: Optional context data to include in the prompt
+            
+        Returns:
+            Generated text response from the LLM
+            
+        Raises:
+            ModelUnavailableError: When the LLM service is unavailable
+            PromptError: When there's an issue with the prompt
+            ResponseError: When there's an issue processing the response
+        """
+        if not user_message:
+            raise PromptError("Empty user message provided")
+            
         # Create the system prompt with error context if available
         api_context = ""
         cmd_context = ""
@@ -132,6 +154,33 @@ class LLMClient:
                 max_tokens=1000,
                 temperature=0.7
             )
+            
+            if not response.choices or not response.choices[0].message:
+                raise ResponseError("Empty response received from LLM")
+                
             return response.choices[0].message.content
+            
+        except ResponseError:
+            # Re-raise our custom exceptions
+            raise
+        except (anthropic.APIError, anthropic.APIConnectionError) as e:
+            raise ModelUnavailableError(
+                message="Deepseek API is currently unavailable",
+                model_name="deepseek-chat",
+                details={"original_error": str(e)}
+            ) from e
+        except (anthropic.APIStatusError, anthropic.BadRequestError) as e:
+            raise PromptError(
+                message="Error in prompt construction or validation",
+                details={
+                    "original_error": str(e),
+                    "user_message_length": len(user_message),
+                    "context_data_provided": context_data is not None
+                }
+            ) from e
         except Exception as e:
-            return f"I encountered an error generating a response: {str(e)}"
+            self.logger.error(f"Unexpected error in LLM response generation: {str(e)}")
+            raise LLMException(
+                message="Unexpected error in LLM response generation",
+                details={"original_error": str(e)}
+            ) from e
