@@ -22,7 +22,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install uv
-        uv install -e ".[dev]"
+        uv add --editable --dev ".[dev]"
     
     - name: Run tests
       run: |
