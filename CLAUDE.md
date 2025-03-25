@@ -49,12 +49,28 @@
   - Conversations are stored using user_id as the partition key
   - Automatic expiry using DynamoDB TTL feature (set with `CONVERSATION_RETENTION_DAYS`)
   - Serialized data includes conversation history, metadata, and timestamps
+  - User preferences stored in the same table with different prefix (PREF_)
+  - Common data model with TTL and last_updated timestamps
+
 - **Integration Points**:
   - `src/bot/conversation.py`: Contains AWS integration hooks for conversation storage
-  - `_archive_conversation()`: Archives conversations to DynamoDB (currently placeholder)
-  - `_try_load_from_aws()`: Loads previous conversations from DynamoDB (currently placeholder)
+    - `_archive_conversation()`: Archives conversations to DynamoDB (currently placeholder)
+    - `_try_load_from_aws()`: Loads previous conversations from DynamoDB (currently placeholder)
+  - `src/bot/preferences.py`: Contains AWS integration hooks for user preferences
+    - `_archive_preferences()`: Archives preferences to DynamoDB (currently placeholder)
+    - `_try_load_from_aws()`: Loads preferences from DynamoDB (currently placeholder)
+
+- **DynamoDB Schema Design**:
+  - Partition key: `user_id` (with prefix for data type: CONV_ or PREF_)
+  - Sort key: Not used in current schema (reserved for future extensions)
+  - Data stored as serialized JSON in a `data` attribute
+  - TTL attribute for automatic cleanup
+  - `last_updated` timestamp for synchronization
+  
 - **Future Work**:
   - Implement actual AWS SDK calls (boto3) in the placeholder methods
   - Add AWS credentials configuration in config.py
-  - Set up CloudWatch metrics for conversation statistics
+  - Set up CloudWatch metrics for conversation statistics and user engagement
   - Implement S3 storage for large conversation contexts
+  - Add GSI for team-based lookups (to find all users following a specific team)
+  - Create AWS CDK/CloudFormation template for easy resource provisioning
