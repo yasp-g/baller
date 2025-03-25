@@ -45,19 +45,19 @@ class EntityExtractor:
     # Competition patterns
     COMPETITION_PATTERNS = [
         # Premier League variations
-        (r'\b(?:premier league|epl|english premier league)\b', 'Premier League', 2021),
+        (r'\b(?:premier league|epl|english premier league|prem)\b', 'Premier League', 2021),
         # La Liga variations
         (r'\b(?:la liga|laliga|spanish la liga)\b', 'La Liga', 2014),
         # Bundesliga variations
-        (r'\b(?:bundesliga|german bundesliga)\b', 'Bundesliga', 2002),
+        (r'\b(?:bundesliga|german bundesliga|buli)\b', 'Bundesliga', 2002),
         # Serie A variations
         (r'\b(?:serie a|italian serie a)\b', 'Serie A', 2019),
         # Ligue 1 variations
-        (r'\b(?:ligue 1|french ligue 1)\b', 'Ligue 1', 2015),
+        (r'\b(?:ligue 1|french ligue 1|ligue un)\b', 'Ligue 1', 2015),
         # Champions League variations
-        (r'\b(?:champions league|ucl|uefa champions league)\b', 'UEFA Champions League', 2001),
+        (r'\b(?:champions league|ucl|uefa champions league|champs league)\b', 'UEFA Champions League', 2001),
         # Europa League variations
-        (r'\b(?:europa league|uel|uefa europa league)\b', 'UEFA Europa League', 2146),
+        (r'\b(?:europa league|uel|uefa europa league|europe)\b', 'UEFA Europa League', 2146),
         # World Cup
         (r'\b(?:world cup|fifa world cup)\b', 'FIFA World Cup', 2000),
         # Generic competitions (need more context to resolve)
@@ -79,7 +79,7 @@ class EntityExtractor:
     # Status patterns
     STATUS_PATTERNS = [
         (r'\b(?:scheduled|upcoming|future)\b', 'SCHEDULED', None),
-        (r'\b(?:live|ongoing|in progress)\b', 'IN_PLAY', None),
+        (r'\b(?:live|ongoing|in progress|current)\b', 'IN_PLAY', None),
         (r'\b(?:finished|completed|past|final|full-?time)\b', 'FINISHED', None),
         (r'\b(?:postponed)\b', 'POSTPONED', None),
         (r'\b(?:canceled|cancelled)\b', 'CANCELLED', None),
