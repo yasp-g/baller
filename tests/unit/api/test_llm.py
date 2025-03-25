@@ -159,3 +159,91 @@ class TestLLMClient:
         assert "error" in messages_str.lower()
         assert "Failed to fetch standings" in messages_str
         assert "standings" in messages_str
+    
+    @pytest.mark.asyncio
+    @patch("src.api.llm.AsyncOpenAI")
+    async def test_generate_relevance_check(self, mock_openai):
+        """Test the relevance check functionality"""
+        # Setup mock OpenAI client
+        mock_client = AsyncMock()
+        mock_openai.return_value = mock_client
+        
+        # Configure the create method and its return value
+        mock_choice = MagicMock()
+        mock_choice.message.content = "YES\nThis is about football."
+        
+        mock_completion = MagicMock()
+        mock_completion.choices = [mock_choice]
+        
+        mock_client.chat.completions.create.return_value = mock_completion
+        
+        # Test the relevance check method
+        llm = LLMClient()
+        response = await llm.generate_relevance_check("Tell me about the Premier League.")
+        
+        # Verify the response
+        assert response == "YES\nThis is about football."
+        assert mock_client.chat.completions.create.called
+        
+        # Verify correct parameters were used
+        call_args = mock_client.chat.completions.create.call_args[1]
+        
+        # Check model and temperature
+        assert call_args.get("model") == "deepseek-chat"
+        assert call_args.get("temperature") == 0.1  # Should use lower temperature for more consistency
+        assert call_args.get("max_tokens") == 100  # Should use fewer tokens for this simple task
+        
+        # Check system and user message
+        messages = call_args.get("messages", [])
+        system_message = messages[0].get('content', '')
+        user_message = messages[1].get('content', '')
+        
+        # Verify system message has relevance detection instructions
+        assert "relevance detection" in system_message.lower()
+        assert "YES or NO" in system_message
+        assert "football/soccer" in system_message
+        assert "inappropriate" in system_message
+        
+        # Verify user message
+        assert "Premier League" in user_message
+    
+    @pytest.mark.asyncio
+    @patch("src.api.llm.AsyncOpenAI")
+    async def test_generate_relevance_check_error_handling(self, mock_openai):
+        """Test error handling in relevance check"""
+        # Setup mock OpenAI client
+        mock_client = AsyncMock()
+        mock_openai.return_value = mock_client
+        
+        # Configure the create method to raise an exception
+        mock_client.chat.completions.create.side_effect = Exception("API error")
+        
+        # Test error handling
+        llm = LLMClient()
+        response = await llm.generate_relevance_check("Test message")
+        
+        # Verify the response defaults to relevant with error explanation
+        assert response.startswith("YES")
+        assert "error" in response.lower()
+    
+    @pytest.mark.asyncio
+    @patch("src.api.llm.AsyncOpenAI")
+    async def test_generate_relevance_check_empty_response(self, mock_openai):
+        """Test handling empty or invalid response from LLM API"""
+        # Setup mock OpenAI client with empty response
+        mock_client = AsyncMock()
+        mock_openai.return_value = mock_client
+        
+        # Create a mock completion with empty choices
+        mock_completion = MagicMock()
+        mock_completion.choices = []
+        
+        mock_client.chat.completions.create.return_value = mock_completion
+        
+        # Test the method with empty response
+        llm = LLMClient()
+        response = await llm.generate_relevance_check("Test message")
+        
+        # Should default to treating it as relevant
+        assert response.startswith("YES")
+        assert "default" in response.lower()

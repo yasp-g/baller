@@ -47,13 +47,26 @@ def mock_llm_client():
     
     llm = MagicMock(spec=LLMClient)
     llm.generate_response = AsyncMock()
+    llm.generate_relevance_check = AsyncMock()
     llm.register_api = MagicMock()
     llm.register_commands = MagicMock()
     llm.record_api_error = MagicMock()
     llm.record_command_error = MagicMock()
     # Set default return for common methods
     llm.generate_response.return_value = "This is a test LLM response"
+    llm.generate_relevance_check.return_value = "YES\nThis is relevant to football"
     return llm
+
+@pytest.fixture
+def mock_content_filter():
+    """Create a mock ContentFilter instance"""
+    from src.bot.content_filter import ContentFilter
+    
+    filter_mock = MagicMock(spec=ContentFilter)
+    filter_mock.is_relevant = AsyncMock()
+    # Default to relevant for most tests
+    filter_mock.is_relevant.return_value = (True, "Relevant to football")
+    return filter_mock
 
 @pytest.fixture
 def mock_preferences_manager():

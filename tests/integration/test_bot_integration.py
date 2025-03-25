@@ -89,7 +89,7 @@ class TestBotIntegration:
         # Verify the response was sent
         assert ctx.send.called
     
-    async def test_message_to_response_flow(self, cog_instance, mock_discord_message, sample_matches_data):
+    async def test_message_to_response_flow(self, cog_instance, mock_discord_message, sample_matches_data, mock_content_filter):
         """Test the full flow from message to response"""
         # Setup mock API responses
         cog_instance._mock_football_api.get_matches = AsyncMock(return_value=sample_matches_data)
@@ -98,8 +98,15 @@ class TestBotIntegration:
         # Setup message with match-related content
         mock_discord_message.content = "What matches are happening this week?"
         
+        # Setup content filter to return relevant
+        mock_content_filter.is_relevant = AsyncMock(return_value=(True, "About football"))
+        cog_instance.content_filter = mock_content_filter
+        
         # Process the message
         await cog_instance.process_conversation(mock_discord_message, mock_discord_message.content)
+        
+        # Verify content filter was called
+        assert mock_content_filter.is_relevant.called
         
         # Verify football API was called to get matches
         assert cog_instance._mock_football_api.get_matches.called

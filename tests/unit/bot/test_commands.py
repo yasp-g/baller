@@ -132,14 +132,74 @@ class TestBallerCommands:
         # Verify error was recorded in LLM client
         assert bot_cog.llm_client.record_command_error.called
     
+    async def test_content_filter_initialization(self, bot_cog, mock_discord_message, mock_content_filter):
+        """Test that the content filter is properly initialized and used"""
+        # Reset conversation manager mock to remove previous calls
+        bot_cog.conversation_manager.reset_mock()
+        bot_cog.llm_client.generate_response.return_value = "Test response"
+        
+        # Manually set the content filter
+        bot_cog.content_filter = mock_content_filter
+        mock_content_filter.is_relevant.return_value = (True, "Football related")
+        
+        # Process a conversation
+        await bot_cog.process_conversation(mock_discord_message, "Test message")
+        
+        # Verify the filter's is_relevant method was called
+        mock_content_filter.is_relevant.assert_called_once_with("Test message")
+        
+        # Verify conversation continued normally for relevant content
+        assert bot_cog.conversation_manager.add_message.called
+        assert bot_cog.llm_client.generate_response.called
+    
+    async def test_irrelevant_content_handling(self, bot_cog, mock_discord_message, mock_content_filter):
+        """Test that irrelevant content is properly handled"""
+        # Configure the mock content filter to reject the message
+        mock_content_filter.is_relevant.return_value = (False, "Not about football")
+        
+        # Add the mock filter to the bot_cog
+        bot_cog.content_filter = mock_content_filter
+        
+        # Reset conversation manager mock to remove previous calls
+        bot_cog.conversation_manager.reset_mock()
+        
+        # Process a non-football conversation
+        await bot_cog.process_conversation(mock_discord_message, "Tell me about basketball")
+        
+        # Verify the filter was called
+        mock_content_filter.is_relevant.assert_called_once_with("Tell me about basketball")
+        
+        # Verify conversation was properly handled
+        # Check that both user message and response were added to history
+        assert bot_cog.conversation_manager.add_message.call_count == 2
+        
+        # Check that a proper response was sent
+        assert mock_discord_message.channel.send.called
+        response = mock_discord_message.channel.send.call_args[0][0]
+        assert "can only help with football-related questions" in response
+        assert "Not about football" in response
+        
+        # Verify that no football API or regular LLM calls were made
+        assert not bot_cog.football_api.get_standings.called
+        assert not bot_cog.football_api.get_matches.called
+        assert not bot_cog.llm_client.generate_response.called
+    
     async def test_process_conversation(self, bot_cog, mock_discord_message, sample_standings_data):
         """Test conversation processing with standings data"""
         # Setup mock responses
         bot_cog.football_api.get_standings.return_value = sample_standings_data
         bot_cog.llm_client.generate_response.return_value = "Here are the Bundesliga standings..."
         
+        # Create a mock content filter that accepts all content
+        mock_filter = MagicMock()
+        mock_filter.is_relevant = AsyncMock(return_value=(True, "About football"))
+        bot_cog.content_filter = mock_filter
+        
         # Test processing a conversation about standings
         await bot_cog.process_conversation(mock_discord_message, "Show me the Bundesliga standings")
+        
+        # Verify content filter was called
+        mock_filter.is_relevant.assert_called_once_with("Show me the Bundesliga standings")
         
         # Verify API was called correctly
         assert bot_cog.football_api.get_standings.called
