@@ -112,7 +112,12 @@ class BallerCommands(commands.Cog):
         # Initialize evaluation sampler if needed
         if not hasattr(self, 'evaluator'):
             from ..api.evaluation import EvaluationSampler
-            self.evaluator = EvaluationSampler(self.llm_client)
+            from ..config import config
+            self.evaluator = EvaluationSampler(
+                self.llm_client,
+                sampling_rate=config.EVALUATION_SAMPLING_RATE,
+                max_daily_samples=config.EVALUATION_MAX_DAILY_SAMPLES
+            )
         
         # Check if content is relevant to football/soccer
         is_relevant, explanation = await self.content_filter.is_relevant(content)
@@ -1028,8 +1033,48 @@ class BallerCommands(commands.Cog):
             # Log evaluation results if performed
             if evaluation:
                 logger.info(f"Response evaluation: {json.dumps(evaluation)}")
+                
+                # Record the overall score if present
+                if evaluation and "OVERALL" in evaluation:
+                    overall_score = evaluation["OVERALL"].get("score")
+                    if overall_score:
+                        self.llm_client.metrics.record("self_evaluation_score", float(overall_score))
         except Exception as e:
             logger.error(f"Error in response evaluation: {str(e)}")
+    
+    @commands.command(name="feedback")
+    async def feedback_command(self, ctx, rating: int, *, comment: str = None):
+        """Record user feedback on recent bot responses
+        
+        Args:
+            rating: Score from 1-10
+            comment: Optional feedback comment
+        """
+        if not 1 <= rating <= 10:
+            await ctx.send("⚠️ Please provide a rating between 1 and 10")
+            return
+            
+        user_id = str(ctx.author.id)
+        timestamp = datetime.now().isoformat()
+        
+        # Store the feedback
+        feedback = {
+            "user_id": user_id,
+            "rating": rating,
+            "comment": comment,
+            "timestamp": timestamp
+        }
+        
+        # Log feedback and store in memory (could be persisted to DB later)
+        logger.info(f"User feedback received: {json.dumps(feedback)}")
+        if not hasattr(self, 'user_feedback'):
+            self.user_feedback = []
+        self.user_feedback.append(feedback)
+        
+        # Also record the score in metrics system
+        self.llm_client.metrics.record("user_feedback_score", float(rating))
+        
+        await ctx.send(f"✅ Thank you for your feedback! (Rating: {rating}/10)")
     
     @commands.command(name="metrics")
     async def metrics_command(self, ctx):
@@ -1092,6 +1137,21 @@ class BallerCommands(commands.Cog):
                 embed.add_field(
                     name="Evaluations Performed",
                     value=f"{eval_score.get('count', 0)}",
+                    inline=True
+                )
+                
+            # Add user feedback scores if available
+            user_score = all_stats.get("user_feedback_score", {})
+            if user_score and user_score.get("count", 0) > 0:
+                avg = user_score.get("avg", 0)
+                embed.add_field(
+                    name="User Feedback Score",
+                    value=f"{avg:.1f}/10",
+                    inline=True
+                )
+                embed.add_field(
+                    name="Feedback Count",
+                    value=f"{user_score.get('count', 0)}",
                     inline=True
                 )
             

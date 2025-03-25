@@ -102,6 +102,16 @@ class SelfEvaluationMetric(ResponseMetric):
             description="LLM-generated quality score (0-10)"
         )
 
+class UserFeedbackMetric(ResponseMetric):
+    """Tracks user-provided feedback scores."""
+    
+    def __init__(self):
+        super().__init__(
+            metric_id="user_feedback_score",
+            category=MetricCategory.CUSTOM,
+            description="User-provided feedback score (1-10)"
+        )
+
 class MetricsTracker:
     """Tracks and manages multiple response metrics."""
     
@@ -197,5 +207,6 @@ def create_default_metrics() -> MetricsTracker:
     tracker.register_metric(ErrorRateMetric())
     tracker.register_metric(RelevanceScoreMetric())
     tracker.register_metric(SelfEvaluationMetric())
+    tracker.register_metric(UserFeedbackMetric())
     
     return tracker

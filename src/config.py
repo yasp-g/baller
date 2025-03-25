@@ -53,6 +53,10 @@ class Config:
     # AWS Integration
     AWS_ENABLED = get_env("AWS_ENABLED", "false").lower() in ("true", "1", "yes")
     
+    # LLM Evaluation Settings
+    EVALUATION_SAMPLING_RATE = float(get_env("EVALUATION_SAMPLING_RATE", "1.0" if ENV == "development" else "0.05"))
+    EVALUATION_MAX_DAILY_SAMPLES = int(get_env("EVALUATION_MAX_DAILY_SAMPLES", "100"))
+    
     @classmethod
     def validate(cls) -> bool:
         """Validate that all required configuration is present"""
