@@ -85,6 +85,68 @@ class LLMClient:
         # Keep only the last 5 errors
         self.command_errors = self.command_errors[-5:]
     
+    async def generate_relevance_check(self, user_message: str) -> str:
+        """Determine if a message is relevant to football/soccer.
+        
+        Args:
+            user_message: The user's message to check
+            
+        Returns:
+            String response with YES/NO and explanation
+        """
+        if not user_message:
+            return "YES\nEmpty messages are considered relevant."
+            
+        system_prompt = """
+        You are a football/soccer relevance detection system. Your job is to determine if a 
+        user's message is relevant to football/soccer topics.
+        
+        Respond with only:
+        YES or NO on the first line
+        A very brief explanation on the second line
+        
+        Examples of relevant topics:
+        - Teams, players, matches, leagues, scores
+        - Football history, rules, events
+        - Sports statistics related to football
+        - Transfer news, football management 
+        - Football gaming (FIFA, Football Manager, etc.)
+        
+        Examples of irrelevant topics:
+        - Other sports not related to football/soccer
+        - Completely unrelated topics (politics, movies, etc.)
+        - Personal questions not related to football
+        - Technical support unrelated to football
+        - Anything inappropriate or NSFW that may be related to football/soccer
+        """
+        
+        try:
+            response = await self.client.chat.completions.create(
+                model="deepseek-chat",  # Or specific model version
+                messages=[
+                    {
+                        "role": "system",
+                        "content": system_prompt.strip()
+                    },
+                    {
+                        "role": "user",
+                        "content": user_message.strip()
+                    }
+                ],
+                max_tokens=100,  # Short response is sufficient
+                temperature=0.1  # Low temperature for more predictable response
+            )
+            
+            if not response.choices or not response.choices[0].message:
+                return "YES\nDefault to relevant due to error."
+                
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            self.logger.error(f"Error in relevance check: {e}")
+            # Default to relevant if there's an error
+            return "YES\nDefault to relevant due to error."
+    
     async def generate_response(
         self, 
         user_message: str, 

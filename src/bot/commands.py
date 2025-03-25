@@ -103,7 +103,27 @@ class BallerCommands(commands.Cog):
         
         logger.info(f"Processing conversation for user {user_id} with content: {content[:50]}...")
         
-        # Add user message to conversation history
+        # Initialize content filter if needed
+        if not hasattr(self, 'content_filter'):
+            from .content_filter import ContentFilter
+            self.content_filter = ContentFilter(self.llm_client)
+        
+        # Check if content is relevant to football/soccer
+        is_relevant, explanation = await self.content_filter.is_relevant(content)
+        
+        if not is_relevant:
+            logger.info(f"Message not relevant to football/soccer: {explanation}")
+            response = f"I'm a football/soccer assistant and can only help with football-related questions. {explanation}"
+            
+            # Add the messages to conversation history
+            self.conversation_manager.add_message(user_id, "user", content)
+            self.conversation_manager.add_message(user_id, "assistant", response)
+            
+            # Send the response and return early
+            await message.channel.send(response)
+            return
+        
+        # Add user message to conversation history (for relevant messages)
         self.conversation_manager.add_message(user_id, "user", content)
         
         # Get user preferences
