@@ -2,6 +2,7 @@ import logging
 import discord
 import asyncio
 import os
+import json
 from discord.ext import commands
 from typing import Optional, Dict, Any, List, Union
 from ..api.sports import FootballAPI
@@ -94,6 +95,12 @@ class BallerCommands(commands.Cog):
     async def process_conversation(self, message, content):
         """Process a conversational message using the LLM and football-data API"""
         user_id = str(message.author.id)
+        
+        # Set user context for all subsequent logs in this request
+        from ..main import request_context, get_request_id
+        request_id = get_request_id()
+        request_context.set_context(user_id=user_id, request_id=request_id)
+        
         logger.info(f"Processing conversation for user {user_id} with content: {content[:50]}...")
         
         # Add user message to conversation history
@@ -136,6 +143,15 @@ class BallerCommands(commands.Cog):
             intent = await self.intent_processor.process_message(user_id, content)
             
             if intent:
+                # Add intent to log context
+                from ..main import request_context
+                intent_data = {
+                    "name": intent.name,
+                    "confidence": intent.confidence,
+                    "has_entities": len(intent.entities) > 0
+                }
+                request_context.set_context(intent=json.dumps(intent_data))
+                
                 logger.info(f"Detected intent: {intent.name} with confidence {intent.confidence:.2f}")
                 intent_info = intent.to_dict()
                 
@@ -787,6 +803,74 @@ class BallerCommands(commands.Cog):
             )
             self.llm_client.record_command_error(error, command="myteams")
             await ctx.send(f"Sorry, I couldn't list your followed teams: {error.message}")
+    
+    @commands.command(name="monitor")
+    async def monitor(self, ctx):
+        """Show system health and monitoring statistics"""
+        try:
+            # Gather monitoring data
+            stats = {
+                "conversations": self.conversation_manager.get_stats(),
+                "uptime": self.bot.get_uptime() if hasattr(self.bot, 'get_uptime') else "N/A"
+            }
+            
+            # Intent processing stats if available
+            if hasattr(self, 'intent_processor'):
+                intent_counts = {}
+                for user_id, context in self.intent_processor.contexts.items():
+                    for intent in context.recent_intents:
+                        intent_name = intent.get("name", "unknown")
+                        if intent_name not in intent_counts:
+                            intent_counts[intent_name] = 0
+                        intent_counts[intent_name] += 1
+                stats["intents"] = intent_counts
+                
+            # Create embed for monitoring stats
+            embed = discord.Embed(
+                title="System Monitoring Stats",
+                color=discord.Color.blue(),
+                timestamp=datetime.now()
+            )
+            
+            # Conversations section
+            if "conversations" in stats:
+                conv_stats = stats["conversations"]
+                embed.add_field(
+                    name="Active Conversations",
+                    value=f"{conv_stats.get('active_count', 0)}"
+                )
+                embed.add_field(
+                    name="Total Messages",
+                    value=f"{conv_stats.get('total_messages', 0)}"
+                )
+                embed.add_field(
+                    name="Avg Messages/Conversation",
+                    value=f"{conv_stats.get('avg_messages_per_conversation', 0):.1f}"
+                )
+            
+            # Intent stats section
+            if "intents" in stats:
+                intent_str = "\n".join([f"{name}: {count}" for name, count in stats["intents"].items()])
+                if not intent_str:
+                    intent_str = "No intents processed yet"
+                embed.add_field(
+                    name="Intent Distribution",
+                    value=f"```\n{intent_str}\n```",
+                    inline=False
+                )
+            
+            # System info section
+            embed.add_field(
+                name="Uptime",
+                value=f"{stats.get('uptime', 'N/A')}"
+            )
+            
+            # Send the monitoring data
+            await ctx.send(embed=embed)
+            
+        except Exception as e:
+            logger.error(f"Error generating monitoring stats: {e}")
+            await ctx.send(f"Error generating monitoring stats: {str(e)}")
     
     @commands.command(name="preferences")
     async def preferences(self, ctx, setting=None, value=None):

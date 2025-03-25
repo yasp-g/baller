@@ -1,5 +1,6 @@
 import httpx
 import logging
+import time
 from datetime import date
 from typing import Dict, Any, Optional, List, Union
 from ..config import config
@@ -99,12 +100,48 @@ class FootballAPI:
             APIResourceNotFoundError: For 404 errors
             APIRateLimitError: For 429 errors
         """
+        # For performance tracking
+        start_time = time.time()
+        
         try:
+            # Get the request method (get, post, etc.)
             request_method = getattr(self.client, method.lower())
+            
+            # Make the request
             response = await request_method(endpoint, **kwargs)
             response.raise_for_status()
-            return response.json()
+            
+            # Parse the response
+            data = response.json()
+            
+            # Track performance metrics
+            duration_ms = round((time.time() - start_time) * 1000)
+            self.logger.info(
+                f"API request: {method.upper()} {resource_type} successful",
+                extra={
+                    "duration_ms": duration_ms,
+                    "status_code": response.status_code,
+                    "endpoint": endpoint,
+                    "resource_type": resource_type,
+                    "resource_id": resource_id
+                }
+            )
+            
+            return data
+            
         except httpx.HTTPError as e:
+            # Log the failure duration
+            duration_ms = round((time.time() - start_time) * 1000)
+            self.logger.error(
+                f"API request failed: {method.upper()} {resource_type}",
+                extra={
+                    "duration_ms": duration_ms,
+                    "endpoint": endpoint,
+                    "resource_type": resource_type,
+                    "resource_id": resource_id,
+                    "error": str(e)
+                }
+            )
             await self._handle_request_exception(e, resource_type, resource_id)
     
     async def get_areas(self, area_id=None):

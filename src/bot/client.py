@@ -1,5 +1,7 @@
 import logging
 import discord
+import time
+from datetime import datetime, timedelta
 from discord.ext import commands
 from ..config import config
 
@@ -16,7 +18,10 @@ class BallerBot(commands.Bot):
             intents=intents,
             help_command=commands.DefaultHelpCommand(),
         )
-
+        
+        # Track bot start time for uptime calculation
+        self.start_time = time.time()
+        
         logger.info("BallerBot initialized")
     
     async def setup_hook(self):
@@ -39,9 +44,32 @@ class BallerBot(commands.Bot):
         logger.info(f"Bot is ready as {self.user.name}#{self.user.discriminator}")
         logger.info(f"Bot user ID: {self.user.id}")
     
+    def get_uptime(self):
+        """Return the bot's uptime in a human-readable format."""
+        uptime_seconds = time.time() - self.start_time
+        uptime = timedelta(seconds=int(uptime_seconds))
+        
+        days = uptime.days
+        hours, remainder = divmod(uptime.seconds, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        
+        parts = []
+        if days > 0:
+            parts.append(f"{days}d")
+        if hours > 0:
+            parts.append(f"{hours}h")
+        if minutes > 0:
+            parts.append(f"{minutes}m")
+        parts.append(f"{seconds}s")
+        
+        return " ".join(parts)
+    
     async def close(self):
         """Override close to perform proper shutdown."""
         logger.info("Bot is shutting down, performing cleanup...")
+        
+        # Log uptime on shutdown
+        logger.info(f"Bot uptime at shutdown: {self.get_uptime()}")
         
         # Properly shut down any cogs with cleanup needs
         for cog_name, cog in self.cogs.items():

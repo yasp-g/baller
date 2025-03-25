@@ -123,6 +123,59 @@
 - **Deployment Infrastructure**: AWS services will be used to deploy and support the application
   - Terraform will be used for managing infrastructure as code
 
+## Monitoring & Debugging
+
+### Built-in Monitoring
+- **Discord Commands**:
+  - `!monitor`: Displays active conversations, intent stats, uptime
+  - `!conversation_stats`: Shows detailed conversation metrics
+
+### Log Format
+Logs are formatted as JSON for better machine processing and include:
+- `timestamp`: When the event occurred
+- `level`: Log level (INFO, ERROR, etc.)
+- `logger`: Component that generated the log
+- `message`: Human-readable description
+- `component`: Subsystem (api, bot, intent, etc.)
+- `request_id`: Unique ID for tracking request across components
+- `user_id`: Discord user ID (when available)
+- `intent`: Intent information (when processing messages)
+- `duration_ms`: Performance metric for API calls
+
+### Deployment Options
+
+#### Local Development
+```bash
+# Run with debug logs
+LOG_LEVEL=DEBUG uv run python -m src.main
+
+# Follow logs with color formatting
+LOG_LEVEL=DEBUG uv run python -m src.main | jq -r '. | "\(.timestamp) [\(.level)] \(.logger): \(.message)"'
+```
+
+#### Docker Deployment
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy requirements and install dependencies
+COPY pyproject.toml uv.lock ./
+RUN pip install uv && uv pip install -e .
+
+# Copy application code
+COPY . .
+
+# Run the application
+CMD ["python", "-m", "src.main"]
+```
+
+```bash
+# Build and run Docker container
+docker build -t baller-bot .
+docker run -e DISCORD_TOKEN=xxx -e FOOTBALL_DATA_API_KEY=xxx -e DEEPSEEK_API_KEY=xxx baller-bot
+```
+
 ## AWS Integration
 - **Configuration**: Enable AWS integration with `AWS_ENABLED=true` environment variable
 - **DynamoDB Integration**: 
@@ -131,6 +184,27 @@
   - Serialized data includes conversation history, metadata, and timestamps
   - User preferences stored in the same table with different prefix (PREF_)
   - Common data model with TTL and last_updated timestamps
+  
+### CloudWatch Integration
+- JSON-formatted logs are compatible with CloudWatch Logs Insights
+- Sample queries:
+  ```
+  # Find errors
+  fields @timestamp, @message
+  | filter level = "ERROR"
+  | sort @timestamp desc
+  | limit 20
+  
+  # API performance metrics
+  fields @timestamp, duration_ms, resource_type
+  | filter component = "sports" and duration_ms > 0
+  | stats avg(duration_ms), max(duration_ms) by resource_type
+  
+  # User activity
+  fields @timestamp, user_id, component
+  | stats count(*) as activity by user_id
+  | sort activity desc
+  ```
 
 - **Integration Points**:
   - `src/bot/conversation.py`: Contains AWS integration hooks for conversation storage
