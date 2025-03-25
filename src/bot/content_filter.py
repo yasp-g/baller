@@ -29,7 +29,7 @@ class ContentFilter:
         """
         logger.debug(f"Checking relevance of message: {content[:50]}...")
         
-        # Use a focused prompt to determine relevance
+        # Use the template-based relevance check
         response = await self.llm_client.generate_relevance_check(content)
         
         # Parse the response to get boolean result and explanation

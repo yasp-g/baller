@@ -2,6 +2,7 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 import json
 from src.api.llm import LLMClient
+from src.api.prompt_templates import ProviderType, PromptTemplate, get_template
 
 class TestLLMClient:
     """Test suite for the LLMClient class"""
@@ -247,3 +248,131 @@ class TestLLMClient:
         # Should default to treating it as relevant
         assert response.startswith("YES")
         assert "default" in response.lower()
+    
+    @pytest.mark.asyncio
+    @patch("src.api.llm.AsyncOpenAI")
+    async def test_provider_detection(self, mock_openai):
+        """Test that the client detects the right provider based on API keys."""
+        # Test with Deepseek
+        with patch('src.api.llm.config') as mock_config:
+            mock_config.DEEPSEEK_API_KEY = "test-key"
+            mock_config.ANTHROPIC_API_KEY = None
+            
+            llm = LLMClient()
+            assert llm.provider_type == ProviderType.OPENAI
+    
+    @pytest.mark.asyncio
+    @patch("src.api.llm.AsyncOpenAI")
+    async def test_template_usage(self, mock_openai):
+        """Test that templates are used correctly for generating prompts."""
+        # Setup mock
+        mock_client = AsyncMock()
+        mock_openai.return_value = mock_client
+        
+        # Create mock completion
+        mock_completion = MagicMock()
+        mock_choice = MagicMock()
+        mock_choice.message.content = "Template test response"
+        mock_completion.choices = [mock_choice]
+        mock_client.chat.completions.create.return_value = mock_completion
+        
+        # Create client
+        with patch('src.api.llm.config'):
+            llm = LLMClient()
+            llm.client = mock_client
+            llm.provider_type = ProviderType.OPENAI
+            
+            # Test with football conversation template
+            await llm.generate_response("Test question")
+            
+            # Verify template was used
+            template = get_template("football_conversation")
+            formatted_prompt = template.format_for_provider("Test question")
+            
+            # Verify call arguments
+            call_args = mock_client.chat.completions.create.call_args[1]
+            assert "messages" in call_args
+            
+            # The structure won't be exactly the same due to additional processing,
+            # but the types and basic structure should match
+            assert len(call_args["messages"]) == len(formatted_prompt["messages"])
+            assert call_args["messages"][0]["role"] == "system"
+            assert call_args["messages"][1]["role"] == "user"
+    
+    @pytest.mark.asyncio
+    async def test_prepare_context_data(self):
+        """Test that context data is properly prepared for templates."""
+        llm = LLMClient()
+        
+        # Register mock components
+        mock_api = MagicMock()
+        mock_commands = MagicMock()
+        llm.register_api(mock_api)
+        llm.register_commands(mock_commands)
+        
+        # Record some errors
+        llm.record_api_error("Test API error", "test_endpoint")
+        llm.record_command_error("Test command error", "test_command")
+        
+        # Create mock user preferences
+        user_prefs = {
+            "followed_teams": set(["Team A", "Team B"]),
+            "notification_settings": {
+                "match_start": True,
+                "goals": False
+            }
+        }
+        
+        # Get context data
+        context = llm._prepare_context_data(user_prefs)
+        
+        # Verify context contents
+        assert "api_context" in context
+        assert "cmd_context" in context
+        assert "user_pref_context" in context
+        
+        # Check API context
+        assert "Football API is available" in context["api_context"]
+        assert "Test API error" in context["api_context"]
+        assert "test_endpoint" in context["api_context"]
+        
+        # Check command context
+        assert "Discord commands are available" in context["cmd_context"]
+        assert "Test command error" in context["cmd_context"]
+        assert "test_command" in context["cmd_context"]
+        
+        # Check user preferences context
+        assert "Team A" in context["user_pref_context"]
+        assert "Team B" in context["user_pref_context"]
+        assert "match_start: Enabled" in context["user_pref_context"]
+        assert "goals: Disabled" in context["user_pref_context"]
+    
+    @pytest.mark.asyncio
+    @patch("src.api.llm.AsyncOpenAI")
+    @patch("src.api.llm.anthropic.AsyncAnthropic")
+    async def test_template_provider_override(self, mock_anthropic, mock_openai):
+        """Test that template provider type is overridden to match client."""
+        # Setup mocks
+        mock_anthropic_client = MagicMock()
+        mock_anthropic.return_value = mock_anthropic_client
+        
+        # Create client and patch directly
+        with patch('src.api.llm.LLMClient._call_provider') as mock_call_provider:
+            # Set up mock return value
+            mock_call_provider.return_value = "Test response"
+            
+            # Create client
+            with patch('src.api.llm.config') as mock_config:
+                mock_config.ANTHROPIC_API_KEY = "test-key"
+                mock_config.DEEPSEEK_API_KEY = None
+                
+                # Create client - will use Anthropic due to mocked config
+                llm = LLMClient()
+                
+                # Call method that uses templates
+                await llm.generate_relevance_check("Test message")
+                
+                # Verify call parameters
+                mock_call_provider.assert_called_once()
+                template = mock_call_provider.call_args[1]["template"]
+                assert template.provider_type == ProviderType.ANTHROPIC

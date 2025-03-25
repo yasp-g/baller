@@ -15,36 +15,48 @@
 ## System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          Discord Bot Interface                          │
-│                               BallerBot                                 │
-└───────────────────────────────────┬─────────────────────────────────────┘
-                                     │
-                                     ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              BallerCommands                             │
-│                                                                         │
-│  ┌─────────────────┐  ┌───────────────────┐  ┌──────────────────────┐   │
-│  │  Discord Slash  │  │   Conversational  │  │  User Preferences    │   │
-│  │    Commands     │  │     Interface     │  │      Management      │   │
-│  └─────────────────┘  └─────────┬─────────┘  └──────────────────────┘   │
-└─────────────────────────────────┬─────────────────────────────────────┬─┘
-                                  │                                     │
-                ┌─────────────────┴──────────────────┐                  │
-                ▼                                     ▼                  ▼
-┌──────────────────────────┐      ┌──────────────────────────┐ ┌─────────────────────┐
-│    Intent Processing     │      │      LLM Client           │ │  Preferences Store  │
-│                          │─────▶│                           │ │                     │
-│ ┌────────────────────┐   │      │ ┌─────────────────────┐   │ │  ┌───────────────┐  │
-│ │  Entity Extraction │   │      │ │  Prompt Generation  │   │ │  │ User Settings │  │
-│ └────────────────────┘   │      │ └─────────────────────┘   │ │  └───────────────┘  │
-│ ┌────────────────────┐   │      │ ┌─────────────────────┐   │ │  ┌───────────────┐  │
-│ │ Context Management │   │      │ │ Response Generation │   │ │  │Followed Teams │  │
-│ └────────────────────┘   │      │ └─────────────────────┘   │ │  └───────────────┘  │
-│ ┌────────────────────┐   │      │ ┌─────────────────────┐   │ │  ┌───────────────┐  │
-│ │   Entity Cache     │   │      │ │   Error Tracking    │   │ │  │  AWS Storage  │  │
-│ └────────────────────┘   │      │ └─────────────────────┘   │ │  └───────────────┘  │
-└──────────────┬───────────┘      └──────────────┬───────────┘ └─────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                          Discord Bot Interface                         │
+│                               BallerBot                                │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                              BallerCommands                            │
+│                                                                        │
+│  ┌─────────────────┐  ┌───────────────────┐  ┌──────────────────────┐  │
+│  │  Discord Slash  │  │   Conversational  │  │  User Preferences    │  │
+│  │    Commands     │  │     Interface     │  │      Management      │  │
+│  └─────────────────┘  └─────────┬─────────┘  └─────────────────────┬┘  │
+└─────────────────────────────────┬──────────────────────────────────┬───┘
+                                  │                                  │
+                                  ▼                                  │
+                     ┌───────────────────────────┐                   │
+                     │    Content Filtering      │                   │
+                     │                           │                   │
+                     │  ┌─────────────────────┐  │                   │
+                     │  │  Relevance Check    │  │                   │
+                     │  └─────────────────────┘  │                   │
+                     │  ┌─────────────────────┐  │                   │
+                     │  │    NSFW Filter      │  │                   │
+                     │  └─────────────────────┘  │                   │
+                     └────────────┬──────────────┘                   │
+                                  │                                  │
+               ┌──────────────────┴─────────────┐                    │
+               ▼                                ▼                    ▼
+┌────────────────────────┐      ┌─────────────────────────┐ ┌─────────────────────┐
+│    Intent Processing   │      │       LLM Client        │ │  Preferences Store  │
+│                        │─────▶│                         │ │                     │
+│ ┌────────────────────┐ │      │ ┌─────────────────────┐ │ │  ┌───────────────┐  │
+│ │  Entity Extraction │ │      │ │  Prompt Templates   │ │ │  │ User Settings │  │
+│ └────────────────────┘ │      │ └─────────────────────┘ │ │  └───────────────┘  │
+│ ┌────────────────────┐ │      │ ┌─────────────────────┐ │ │  ┌───────────────┐  │
+│ │ Context Management │ │      │ │ Response Generation │ │ │  │Followed Teams │  │
+│ └────────────────────┘ │      │ └─────────────────────┘ │ │  └───────────────┘  │
+│ ┌────────────────────┐ │      │ ┌─────────────────────┐ │ │  ┌───────────────┐  │
+│ │   Entity Cache     │ │      │ │   Error Tracking    │ │ │  │  AWS Storage  │  │
+│ └────────────────────┘ │      │ └─────────────────────┘ │ │  └───────────────┘  │
+└──────────────┬─────────┘      └──────────────┬──────────┘ └─────────────────────┘
                │                                 │
                │                                 │
                ▼                                 ▼
@@ -52,8 +64,8 @@
 │                            External API Client                          │
 │                                                                         │
 │  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐    │
-│  │  FootballAPI    │     │  DeepseekAPI    │     │   Cache Layer   │    │
-│  │  (football-data)│     │    (LLM API)    │     │  (Local/AWS)    │    │
+│  │  FootballAPI    │     │   LLM APIs      │     │   Cache Layer   │    │
+│  │  (football-data)│     │(Deepseek/Claude)│     │  (Local/AWS)    │    │
 │  └─────────────────┘     └─────────────────┘     └─────────────────┘    │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -67,7 +79,9 @@
 | **Conversation Management** | Maintain chat context | `ConversationManager` | Track message history, manage timeouts, archive conversations |
 | **User Preferences** | Store user settings | `UserPreferencesManager` | Follow/unfollow teams, notification settings, persist preferences |
 | **Intent System** | Understand user queries | `IntentProcessor`, `EntityExtractor` | Extract entities, detect intents, maintain conversation context |
+| **Content Filtering** | Filter relevance | `ContentFilter` | Determine message relevance to football, filter inappropriate content |
 | **LLM Client** | Generate responses | `LLMClient` | Format prompts, call LLM APIs, process responses |
+| **Prompt Templates** | Structure prompts | `PromptTemplate` | Standardize prompts across providers, implement best practices |
 | **Football API** | Fetch football data | `FootballAPI` | Interface with football-data.org API, handle rate limits |
 | **Cache Layer** | Optimize performance | `EntityCache` | Cache API responses, sports entities, reduce API calls |
 
@@ -75,14 +89,16 @@
 
 1. User sends message to Discord bot
 2. `BallerCommands` processes message
-3. `IntentProcessor` determines user intent & extracts entities
-4. `FootballAPI` fetches relevant football data based on intent
-5. `LLMClient` generates response using:
+3. `ContentFilter` determines if message is football-relevant
+4. If relevant, `IntentProcessor` determines user intent & extracts entities
+5. `FootballAPI` fetches relevant football data based on intent
+6. `PromptTemplate` structures a prompt with all available context
+7. `LLMClient` generates response using the formatted prompt with:
    - The user message
    - Detected intent
    - Fetched football data 
    - User preferences
-6. Response sent back to user via Discord
+8. Response sent back to user via Discord
 
 ## Storage Systems
 
