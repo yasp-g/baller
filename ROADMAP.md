@@ -1,9 +1,9 @@
 # ROADMAP
 
 ## Progress Summary
-- **Last Updated**: March 24, 2025
+- **Last Updated**: March 25, 2025
 - **Core Infrastructure**: 92% complete (Configuration system, logging, testing, error handling, memory management)
-- **NLP Enhancements**: 15% complete (Conversation management)
+- **NLP Enhancements**: 65% complete (Conversation management, intent detection)
 - **Football Data Features**: 0% complete
 - **User Experience**: 25% complete (User preferences, team following)
 - **Scalability**: 10% complete (AWS integration foundation)
@@ -13,7 +13,9 @@
 2. ✅ Complete error handling (custom exceptions, retry mechanisms)
 3. ✅ Add conversation timeout/expiry for memory management
 4. ✅ Add user preferences and team following
-5. Implement caching for frequently accessed football data
+5. ✅ Implement intent detection system for better query understanding
+6. Implement caching for frequently accessed football data
+7. Standardize prompt templates across different LLM providers
 
 ## 1. Core Infrastructure Improvements
 
@@ -37,10 +39,21 @@
 ## 2. Natural Language Processing Enhancements
 
 ### 2.1 Intent Detection
-- Replace keyword matching with structured intent recognition
-- Implement entity extraction (teams, players, competitions)
-- Add context awareness for multi-turn conversations
-- Support for common football-related queries and commands
+- ✅ Replace keyword matching with structured intent recognition
+  - Implemented resource-aware intent system that maps intents to API endpoints
+  - Created entity extraction system for competitions, teams, timeframes, etc.
+  - Added graceful fallback to keyword matching for backward compatibility
+- ✅ Implement entity extraction (teams, players, competitions)
+  - Created pattern-based entity extraction for competitions and timeframes
+  - Added team entity recognition with ID resolution
+  - Implemented entity caching system for improved performance
+- ✅ Add context awareness for multi-turn conversations
+  - Implemented conversation context tracking across multiple turns
+  - Added entity and intent history with confidence decay over time
+  - Support for follow-up questions that reference previous entities
+- ✅ Support for common football-related queries and commands
+  - Added support for standings, matches, teams, and scorers queries
+  - Implemented context-sensitive intent resolution
 
 ### 2.2 Conversation Management
 - ✅ Improve conversation history management with proper state tracking

@@ -1,6 +1,7 @@
 import logging
 import discord
 import asyncio
+import os
 from discord.ext import commands
 from typing import Optional, Dict, Any, List, Union
 from ..api.sports import FootballAPI
@@ -102,115 +103,249 @@ class BallerCommands(commands.Cog):
         user_prefs = self.preferences_manager.get_user_preferences(user_id)
         followed_teams = user_prefs.get("followed_teams", set())
         
+        # Initialize intent system if not already done
+        if not hasattr(self, 'intent_processor'):
+            from .intent.entities import EntityExtractor
+            from .intent.cache import EntityCache
+            from .intent.processor import IntentProcessor
+            
+            # Initialize the entity cache
+            logger.info("Initializing entity cache...")
+            self.entity_cache = EntityCache(self.football_api)
+            
+            # Initialize the entity extractor
+            self.entity_extractor = EntityExtractor()
+            
+            # Initialize the intent processor
+            self.intent_processor = IntentProcessor(
+                entity_extractor=self.entity_extractor,
+                entity_cache=self.entity_cache
+            )
+            
+            # Start loading the entity cache (don't wait for it to complete)
+            asyncio.create_task(self.entity_cache.initialize())
+            logger.info("Intent system initialized")
+        
         # Analyze the message to determine what football data we need
         relevant_data = None
-        logger.debug(f"Analyzing message for football data keywords")
+        intent_info = None
+        logger.debug(f"Processing message with intent system")
         
         try:
-            if "standing" in content.lower() or "table" in content.lower():
-                logger.debug("Found standing/table keyword")
-                # Premier League standings (competition ID 2021 is Premier League)
-                if "premier" in content.lower() or "epl" in content.lower():
-                    logger.info("Fetching Premier League standings")
+            # Process with the intent system
+            intent = await self.intent_processor.process_message(user_id, content)
+            
+            if intent:
+                logger.info(f"Detected intent: {intent.name} with confidence {intent.confidence:.2f}")
+                intent_info = intent.to_dict()
+                
+                # Map intent to API calls
+                if intent.name == "get_standings" and "competition_id" in intent.api_params:
+                    # Get standings for a competition
+                    competition_id = intent.api_params["competition_id"]
+                    logger.info(f"Fetching standings for competition {competition_id}")
                     try:
-                        standings = await self.football_api.get_standings(competition_id=2021)
+                        standings = await self.football_api.get_standings(competition_id=competition_id)
                         relevant_data = standings
-                        logger.debug("Premier League standings fetched successfully")
+                        logger.debug("Standings fetched successfully")
                     except APIException as e:
-                        logger.error(f"API error fetching Premier League standings: {e}")
-                        self.llm_client.record_api_error(e, "standings/premier-league")
-                # Bundesliga standings (competition ID 2002)
-                elif "bundesliga" in content.lower():
-                    logger.info("Fetching Bundesliga standings")
+                        logger.error(f"API error fetching standings: {e}")
+                        self.llm_client.record_api_error(e, f"standings/competition-{competition_id}")
+                
+                elif intent.name == "get_matches":
+                    # Get matches with optional filters
+                    date_from = intent.api_params.get("date_from", date.today().isoformat())
+                    date_to = intent.api_params.get("date_to")
+                    status = intent.api_params.get("status")
+                    competition_id = intent.api_params.get("competition_id")
+                    
+                    logger.info(f"Fetching matches from {date_from} to {date_to or 'N/A'}")
                     try:
-                        standings = await self.football_api.get_standings(competition_id=2002)
-                        relevant_data = standings
-                        logger.debug("Bundesliga standings fetched successfully")
+                        if competition_id:
+                            matches = await self.football_api.get_competition_matches(
+                                competition_id=competition_id,
+                                date_from=date_from,
+                                date_to=date_to,
+                                status=status
+                            )
+                        else:
+                            matches = await self.football_api.get_matches(
+                                date_from=date_from,
+                                date_to=date_to,
+                                status=status,
+                                competitions=competition_id  # Will be None if not specified
+                            )
+                        relevant_data = matches
+                        logger.debug("Matches fetched successfully")
                     except APIException as e:
-                        logger.error(f"API error fetching Bundesliga standings: {e}")
-                        self.llm_client.record_api_error(e, "standings/bundesliga")
-                # La Liga standings (competition ID 2014)
-                elif "la liga" in content.lower() or "laliga" in content.lower():
-                    logger.info("Fetching La Liga standings")
+                        logger.error(f"API error fetching matches: {e}")
+                        self.llm_client.record_api_error(e, "matches/date-range")
+                
+                elif intent.name == "get_team_matches" and "team_id" in intent.api_params:
+                    # Get matches for a specific team
+                    team_id = intent.api_params["team_id"]
+                    date_from = intent.api_params.get("date_from", date.today().isoformat())
+                    date_to = intent.api_params.get("date_to")
+                    status = intent.api_params.get("status")
+                    
+                    logger.info(f"Fetching matches for team {team_id}")
                     try:
-                        standings = await self.football_api.get_standings(competition_id=2014)
-                        relevant_data = standings
-                        logger.debug("La Liga standings fetched successfully")
+                        matches = await self.football_api.get_team_matches(
+                            team_id=team_id,
+                            date_from=date_from,
+                            date_to=date_to,
+                            status=status
+                        )
+                        relevant_data = matches
+                        logger.debug("Team matches fetched successfully")
                     except APIException as e:
-                        logger.error(f"API error fetching La Liga standings: {e}")
-                        self.llm_client.record_api_error(e, "standings/la-liga")
+                        logger.error(f"API error fetching team matches: {e}")
+                        self.llm_client.record_api_error(e, f"matches/team-{team_id}")
+                
+                elif intent.name == "get_competition_teams" and "competition_id" in intent.api_params:
+                    # Get teams for a competition
+                    competition_id = intent.api_params["competition_id"]
+                    logger.info(f"Fetching teams for competition {competition_id}")
+                    try:
+                        teams = await self.football_api.get_competition_teams(competition_id=competition_id)
+                        relevant_data = teams
+                        logger.debug("Competition teams fetched successfully")
+                    except APIException as e:
+                        logger.error(f"API error fetching competition teams: {e}")
+                        self.llm_client.record_api_error(e, f"teams/competition-{competition_id}")
+                
+                elif intent.name == "get_team" and "team_id" in intent.api_params:
+                    # Get info about a specific team
+                    team_id = intent.api_params["team_id"]
+                    logger.info(f"Fetching info for team {team_id}")
+                    try:
+                        team = await self.football_api.get_team(team_id=team_id)
+                        relevant_data = team
+                        logger.debug("Team info fetched successfully")
+                    except APIException as e:
+                        logger.error(f"API error fetching team info: {e}")
+                        self.llm_client.record_api_error(e, f"team/{team_id}")
+                
+                elif intent.name == "get_competition_scorers" and "competition_id" in intent.api_params:
+                    # Get scorers for a competition
+                    competition_id = intent.api_params["competition_id"]
+                    logger.info(f"Fetching scorers for competition {competition_id}")
+                    try:
+                        scorers = await self.football_api.get_scorers(competition_id=competition_id)
+                        relevant_data = scorers
+                        logger.debug("Competition scorers fetched successfully")
+                    except APIException as e:
+                        logger.error(f"API error fetching competition scorers: {e}")
+                        self.llm_client.record_api_error(e, f"scorers/competition-{competition_id}")
+            
+            # Fall back to keyword matching if no intent was detected or confidence is low
+            if not intent or intent.confidence < 0.4 or not relevant_data:
+                logger.info("Falling back to keyword matching for intent detection")
+                
+                if "standing" in content.lower() or "table" in content.lower():
+                    logger.debug("Found standing/table keyword")
+                    # Premier League standings (competition ID 2021 is Premier League)
+                    if "premier" in content.lower() or "epl" in content.lower():
+                        logger.info("Fetching Premier League standings")
+                        try:
+                            standings = await self.football_api.get_standings(competition_id=2021)
+                            relevant_data = standings
+                            logger.debug("Premier League standings fetched successfully")
+                        except APIException as e:
+                            logger.error(f"API error fetching Premier League standings: {e}")
+                            self.llm_client.record_api_error(e, "standings/premier-league")
+                    # Bundesliga standings (competition ID 2002)
+                    elif "bundesliga" in content.lower():
+                        logger.info("Fetching Bundesliga standings")
+                        try:
+                            standings = await self.football_api.get_standings(competition_id=2002)
+                            relevant_data = standings
+                            logger.debug("Bundesliga standings fetched successfully")
+                        except APIException as e:
+                            logger.error(f"API error fetching Bundesliga standings: {e}")
+                            self.llm_client.record_api_error(e, "standings/bundesliga")
+                    # La Liga standings (competition ID 2014)
+                    elif "la liga" in content.lower() or "laliga" in content.lower():
+                        logger.info("Fetching La Liga standings")
+                        try:
+                            standings = await self.football_api.get_standings(competition_id=2014)
+                            relevant_data = standings
+                            logger.debug("La Liga standings fetched successfully")
+                        except APIException as e:
+                            logger.error(f"API error fetching La Liga standings: {e}")
+                            self.llm_client.record_api_error(e, "standings/la-liga")
 
-            elif "match" in content.lower() or "game" in content.lower() or "fixture" in content.lower():
-                logger.debug("Found match/game/fixture keyword")
-                today = date.today()
-                
-                # Get today's matches
-                if "today" in content.lower():
-                    logger.info(f"Fetching today's matches ({today})")
-                    try:
-                        matches = await self.football_api.get_matches(date_from=today, date_to=today)
-                        relevant_data = matches
-                        logger.debug("Today's matches fetched successfully")
-                    except APIException as e:
-                        logger.error(f"API error fetching today's matches: {e}")
-                        self.llm_client.record_api_error(e, "matches/today")
-                # Get tomorrow's matches
-                elif "tomorrow" in content.lower():
-                    tomorrow = today + timedelta(days=1)
-                    logger.info(f"Fetching tomorrow's matches ({tomorrow})")
-                    try:
-                        matches = await self.football_api.get_matches(date_from=tomorrow, date_to=tomorrow)
-                        relevant_data = matches
-                        logger.debug("Tomorrows's matches fetched successfully")
-                    except APIException as e:
-                        logger.error(f"API error fetching tomorrow's matches: {e}")
-                        self.llm_client.record_api_error(e, "matches/tomorrow")
-                # Get weekend matches
-                elif "weekend" in content.lower():
-                    # Calculate the next weekend (Sat-Sun)
-                    days_until_saturday = (5 - today.weekday()) % 7
-                    if days_until_saturday == 0:  # It's already Saturday
-                        saturday = today
+                elif "match" in content.lower() or "game" in content.lower() or "fixture" in content.lower():
+                    logger.debug("Found match/game/fixture keyword")
+                    today = date.today()
+                    
+                    # Get today's matches
+                    if "today" in content.lower():
+                        logger.info(f"Fetching today's matches ({today})")
+                        try:
+                            matches = await self.football_api.get_matches(date_from=today, date_to=today)
+                            relevant_data = matches
+                            logger.debug("Today's matches fetched successfully")
+                        except APIException as e:
+                            logger.error(f"API error fetching today's matches: {e}")
+                            self.llm_client.record_api_error(e, "matches/today")
+                    # Get tomorrow's matches
+                    elif "tomorrow" in content.lower():
+                        tomorrow = today + timedelta(days=1)
+                        logger.info(f"Fetching tomorrow's matches ({tomorrow})")
+                        try:
+                            matches = await self.football_api.get_matches(date_from=tomorrow, date_to=tomorrow)
+                            relevant_data = matches
+                            logger.debug("Tomorrows's matches fetched successfully")
+                        except APIException as e:
+                            logger.error(f"API error fetching tomorrow's matches: {e}")
+                            self.llm_client.record_api_error(e, "matches/tomorrow")
+                    # Get weekend matches
+                    elif "weekend" in content.lower():
+                        # Calculate the next weekend (Sat-Sun)
+                        days_until_saturday = (5 - today.weekday()) % 7
+                        if days_until_saturday == 0:  # It's already Saturday
+                            saturday = today
+                        else:
+                            saturday = today + timedelta(days=days_until_saturday)
+                        sunday = saturday + timedelta(days=1)
+                        logger.info(f"Fetching weekend matches (from {saturday} to {sunday})")
+                        try:
+                            matches = await self.football_api.get_matches(date_from=saturday, date_to=sunday)
+                            relevant_data = matches
+                            logger.debug("Fetching this weekend's matches")
+                        except APIException as e:
+                            logger.error(f"API error fetching weekend matches: {e}")
+                            self.llm_client.record_api_error(e, "matches/weekend")
+                    # Default to next 7 days
                     else:
-                        saturday = today + timedelta(days=days_until_saturday)
-                    sunday = saturday + timedelta(days=1)
-                    logger.info(f"Fetching weekend matches (from {saturday} to {sunday})")
-                    try:
-                        matches = await self.football_api.get_matches(date_from=saturday, date_to=sunday)
-                        relevant_data = matches
-                        logger.debug("Fetching this weekend's matches")
-                    except APIException as e:
-                        logger.error(f"API error fetching weekend matches: {e}")
-                        self.llm_client.record_api_error(e, "matches/weekend")
-                # Default to next 7 days
-                else:
-                    next_week = today + timedelta(days=7)
-                    logger.info(f"Fetching matches for the next 7 days (until {next_week})")
-                    try:
-                        matches = await self.football_api.get_matches(date_from=today, date_to=next_week)
-                        relevant_data = matches
-                        logger.debug("Next 7 days' matches fetched successfully")
-                    except APIException as e:
-                        logger.error(f"API error fetching next 7 days matches: {e}")
-                        self.llm_client.record_api_error(e, "matches/week")
-                
-                # Filter by competition if mentioned
-                if "premier" in content.lower() or "epl" in content.lower() and relevant_data:
-                    # Re-fetch with competition filter
-                    if isinstance(relevant_data.get("matches"), list):
-                        date_from = relevant_data.get("resultSet", {}).get("first")
-                        date_to = relevant_data.get("resultSet", {}).get("last")
-                        if date_from and date_to:
-                            try:
-                                matches = await self.football_api.get_matches(
-                                    date_from=date_from, 
-                                    date_to=date_to,
-                                    competitions="2021"  # Premier League
-                                )
-                                relevant_data = matches
-                            except APIException as e:
-                                logger.error(f"API error fetching Premier League filtered matches: {e}")
-                                self.llm_client.record_api_error(e, "matches/premier-league")
+                        next_week = today + timedelta(days=7)
+                        logger.info(f"Fetching matches for the next 7 days (until {next_week})")
+                        try:
+                            matches = await self.football_api.get_matches(date_from=today, date_to=next_week)
+                            relevant_data = matches
+                            logger.debug("Next 7 days' matches fetched successfully")
+                        except APIException as e:
+                            logger.error(f"API error fetching next 7 days matches: {e}")
+                            self.llm_client.record_api_error(e, "matches/week")
+                    
+                    # Filter by competition if mentioned
+                    if "premier" in content.lower() or "epl" in content.lower() and relevant_data:
+                        # Re-fetch with competition filter
+                        if isinstance(relevant_data.get("matches"), list):
+                            date_from = relevant_data.get("resultSet", {}).get("first")
+                            date_to = relevant_data.get("resultSet", {}).get("last")
+                            if date_from and date_to:
+                                try:
+                                    matches = await self.football_api.get_matches(
+                                        date_from=date_from, 
+                                        date_to=date_to,
+                                        competitions="2021"  # Premier League
+                                    )
+                                    relevant_data = matches
+                                except APIException as e:
+                                    logger.error(f"API error fetching Premier League filtered matches: {e}")
+                                    self.llm_client.record_api_error(e, "matches/premier-league")
             
             logger.info(f"Relevant data type retrieved: {type(relevant_data).__name__ if relevant_data else 'None'}")
             if relevant_data:
@@ -219,9 +354,19 @@ class BallerCommands(commands.Cog):
             # Generate response using the LLM
             logger.info("Generating response using LLM")
             try:
+                # Include intent information in the context data
+                context_data = relevant_data
+                if intent_info:
+                    # If we have intent info but no relevant data, pass the intent info as the context
+                    if not context_data:
+                        context_data = {"intent": intent_info}
+                    # Otherwise, add intent info to the existing context data
+                    elif isinstance(context_data, dict):
+                        context_data["intent"] = intent_info
+                
                 response = await self.llm_client.generate_response(
                     content, 
-                    relevant_data,
+                    context_data,
                     user_preferences=user_prefs
                 )
                 logger.debug(f"LLM response generated: {response[:50]}...")
