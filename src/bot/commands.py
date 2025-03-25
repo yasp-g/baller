@@ -108,6 +108,11 @@ class BallerCommands(commands.Cog):
             from .content_filter import ContentFilter
             self.content_filter = ContentFilter(self.llm_client)
         
+        # Initialize evaluation sampler if needed
+        if not hasattr(self, 'evaluator'):
+            from ..api.evaluation import EvaluationSampler
+            self.evaluator = EvaluationSampler(self.llm_client)
+        
         # Check if content is relevant to football/soccer
         is_relevant, explanation = await self.content_filter.is_relevant(content)
         
@@ -428,6 +433,13 @@ class BallerCommands(commands.Cog):
             try:
                 await message.channel.send(response)
                 logger.debug("Response sent successfully")
+                
+                # Sample for evaluation (asynchronously, doesn't block user experience)
+                asyncio.create_task(self._evaluate_response_sample(
+                    user_message=content,
+                    bot_response=response,
+                    context_data=context_data
+                ))
             except Exception as e:
                 logger.error(f"Error sending response: {e}")
                 
@@ -952,6 +964,115 @@ class BallerCommands(commands.Cog):
         except Exception as e:
             logger.error(f"Error updating preference: {e}")
             await ctx.send(f"Sorry, I couldn't update your preference: {str(e)}")
+    
+    async def _evaluate_response_sample(
+        self,
+        user_message: str,
+        bot_response: str,
+        context_data: Optional[Dict[str, Any]] = None
+    ):
+        """Sample responses for evaluation."""
+        try:
+            # Maybe evaluate (based on sampling rate)
+            evaluation = await self.evaluator.maybe_evaluate(
+                user_message=user_message,
+                bot_response=bot_response,
+                context_data=context_data
+            )
+            
+            # Log evaluation results if performed
+            if evaluation:
+                logger.info(f"Response evaluation: {json.dumps(evaluation)}")
+        except Exception as e:
+            logger.error(f"Error in response evaluation: {str(e)}")
+    
+    @commands.command(name="metrics")
+    async def metrics_command(self, ctx):
+        """Show LLM metrics and response quality statistics"""
+        try:
+            # Get metrics from LLM client
+            all_stats = self.llm_client.metrics.get_all_stats()
+            
+            # Format the metrics report
+            embed = discord.Embed(
+                title="Response Quality Metrics",
+                color=discord.Color.blue(),
+                timestamp=datetime.now()
+            )
+            
+            # Add latency stats
+            latency = all_stats.get("response_latency", {})
+            if latency and latency.get("count", 0) > 0:
+                avg = latency.get("avg", 0)
+                embed.add_field(
+                    name="Average Response Time",
+                    value=f"{avg:.2f}s",
+                    inline=True
+                )
+                embed.add_field(
+                    name="Min/Max Response Time",
+                    value=f"{latency.get('min', 0):.2f}s / {latency.get('max', 0):.2f}s",
+                    inline=True
+                )
+            
+            # Add error rate
+            error_rate = all_stats.get("error_rate", {})
+            if error_rate and error_rate.get("count", 0) > 0:
+                rate = error_rate.get("avg", 0) * 100
+                embed.add_field(
+                    name="Error Rate",
+                    value=f"{rate:.2f}%",
+                    inline=True
+                )
+            
+            # Add relevance scores
+            relevance = all_stats.get("relevance_score", {})
+            if relevance and relevance.get("count", 0) > 0:
+                avg = relevance.get("avg", 0) * 10  # Scale to 0-10
+                embed.add_field(
+                    name="Average Relevance Score",
+                    value=f"{avg:.1f}/10",
+                    inline=True
+                )
+            
+            # Add self-evaluation scores if available
+            eval_score = all_stats.get("self_evaluation_score", {})
+            if eval_score and eval_score.get("count", 0) > 0:
+                avg = eval_score.get("avg", 0)
+                embed.add_field(
+                    name="LLM Self-Evaluation Score",
+                    value=f"{avg:.1f}/10",
+                    inline=True
+                )
+                embed.add_field(
+                    name="Evaluations Performed",
+                    value=f"{eval_score.get('count', 0)}",
+                    inline=True
+                )
+            
+            # Add general stats
+            total_responses = latency.get("count", 0)
+            embed.add_field(
+                name="Total Responses",
+                value=f"{total_responses}",
+                inline=True
+            )
+            
+            # Add message length stats
+            length = all_stats.get("response_length", {})
+            if length and length.get("count", 0) > 0:
+                avg = length.get("avg", 0)
+                embed.add_field(
+                    name="Average Response Length",
+                    value=f"{avg:.0f} characters",
+                    inline=True
+                )
+            
+            await ctx.send(embed=embed)
+            
+        except Exception as e:
+            logger.error(f"Error retrieving metrics: {e}")
+            await ctx.send(f"Error retrieving metrics: {str(e)}")
     
     async def shutdown(self):
         """Clean up resources when shutting down."""

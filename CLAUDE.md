@@ -57,9 +57,9 @@
 │ │   Entity Cache     │ │      │ │   Error Tracking    │ │ │  │  AWS Storage  │  │
 │ └────────────────────┘ │      │ └─────────────────────┘ │ │  └───────────────┘  │
 └──────────────┬─────────┘      └──────────────┬──────────┘ └─────────────────────┘
-               │                                 │
-               │                                 │
-               ▼                                 ▼
+               │                               │
+               │                               │
+               ▼                               ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                            External API Client                          │
 │                                                                         │
@@ -82,6 +82,7 @@
 | **Content Filtering** | Filter relevance | `ContentFilter` | Determine message relevance to football, filter inappropriate content |
 | **LLM Client** | Generate responses | `LLMClient` | Format prompts, call LLM APIs, process responses |
 | **Prompt Templates** | Structure prompts | `PromptTemplate` | Standardize prompts across providers, implement best practices |
+| **Response Evaluation** | Quality metrics | `MetricsTracker`, `EvaluationSampler` | Track response metrics, sample responses for LLM self-evaluation |
 | **Football API** | Fetch football data | `FootballAPI` | Interface with football-data.org API, handle rate limits |
 | **Cache Layer** | Optimize performance | `EntityCache` | Cache API responses, sports entities, reduce API calls |
 
@@ -99,6 +100,8 @@
    - Fetched football data 
    - User preferences
 8. Response sent back to user via Discord
+9. `EvaluationSampler` may evaluate response quality using LLM-based criteria
+10. Quality metrics are tracked and available through the `!metrics` command
 
 ## Storage Systems
 
@@ -151,6 +154,7 @@
 - **Discord Commands**:
   - `!monitor`: Displays active conversations, intent stats, uptime
   - `!conversation_stats`: Shows detailed conversation metrics
+  - `!metrics`: Shows LLM response quality metrics (latency, relevance, self-evaluation scores)
 
 ### Log Format
 Logs are formatted as JSON for better machine processing and include:

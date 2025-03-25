@@ -1,11 +1,84 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 import json
+import time
 from src.api.llm import LLMClient
 from src.api.prompt_templates import ProviderType, PromptTemplate, get_template
+from src.api.evaluation import MetricCategory
 
 class TestLLMClient:
     """Test suite for the LLMClient class"""
+    
+    @pytest.mark.asyncio
+    @patch("src.api.llm.AsyncOpenAI")
+    async def test_metrics_recording(self, mock_openai):
+        """Test that metrics are recorded during response generation."""
+        # Setup mock response
+        mock_client = AsyncMock()
+        mock_openai.return_value = mock_client
+        
+        # Create a mock completion
+        mock_choice = MagicMock()
+        mock_choice.message.content = "Test response about football matches"
+        
+        mock_completion = MagicMock()
+        mock_completion.choices = [mock_choice]
+        
+        mock_client.chat.completions.create.return_value = mock_completion
+        
+        # Test the LLM client
+        llm = LLMClient()
+        await llm.generate_response("Test question")
+        
+        # Verify metrics were recorded
+        assert "response_latency" in llm.metrics.metrics
+        assert len(llm.metrics.metrics["response_latency"].values) == 1
+        assert "response_length" in llm.metrics.metrics
+        assert llm.metrics.metrics["response_length"].values[0] > 0
+        assert "error_rate" in llm.metrics.metrics
+        assert llm.metrics.metrics["error_rate"].values[0] == 0
+        assert "relevance_score" in llm.metrics.metrics
+        
+    @pytest.mark.asyncio
+    @patch("src.api.llm.AsyncOpenAI")
+    async def test_evaluation(self, mock_openai):
+        """Test response evaluation functionality."""
+        # Setup mock client
+        mock_client = AsyncMock()
+        mock_openai.return_value = mock_client
+        
+        # Create a mock completion for the evaluation
+        mock_choice = MagicMock()
+        mock_choice.message.content = """
+RELEVANCE: 9 - Directly addresses the user's question about match information
+ACCURACY: 8 - Information appears correct but missing some details
+COMPLETENESS: 7 - Covers the basic information but could provide more context
+CLARITY: 9 - Very clear and well-structured response
+OVERALL: 8.25 - Good quality response that meets the user's needs
+"""
+        
+        mock_completion = MagicMock()
+        mock_completion.choices = [mock_choice]
+        
+        mock_client.chat.completions.create.return_value = mock_completion
+        
+        # Test evaluation
+        llm = LLMClient()
+        evaluation = await llm.evaluate_response(
+            user_message="When is the next Arsenal match?",
+            bot_response="Arsenal plays Chelsea this Saturday at 3pm at Emirates Stadium."
+        )
+        
+        # Verify evaluation parsing
+        assert "RELEVANCE" in evaluation
+        assert "ACCURACY" in evaluation
+        assert "OVERALL" in evaluation
+        assert evaluation["OVERALL"]["score"] == 8.25
+        assert "quality response" in evaluation["OVERALL"]["justification"]
+        
+        # Verify metric was recorded
+        assert "self_evaluation_score" in llm.metrics.metrics
+        assert llm.metrics.metrics["self_evaluation_score"].values[0] == 8.25
     
     @pytest.mark.asyncio
     @patch("src.api.llm.AsyncOpenAI")

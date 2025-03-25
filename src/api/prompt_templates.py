@@ -236,10 +236,66 @@ Examples of irrelevant topics:
         return user_message
 
 
+class ResponseEvaluationTemplate(PromptTemplate):
+    """Template for LLM to evaluate its own responses."""
+    
+    def __init__(
+        self,
+        version: str = "1.0",
+        provider_type: ProviderType = ProviderType.OPENAI
+    ):
+        """Initialize the evaluation template."""
+        super().__init__(
+            template_id="response_evaluation",
+            description="Template for evaluating response quality",
+            version=version,
+            provider_type=provider_type
+        )
+    
+    def get_system_prompt(self, **kwargs) -> str:
+        """Get the system prompt for response evaluation."""
+        return """
+You are a football knowledge evaluator. Your task is to evaluate the quality of a response to a user question about football. Provide a detailed evaluation according to these criteria:
+
+1. Relevance (0-10): Does the response address the user's question directly?
+2. Accuracy (0-10): Is the football information factually correct?
+3. Completeness (0-10): Does the response provide a thorough answer?
+4. Clarity (0-10): Is the response easy to understand?
+
+For each criterion, provide a score and a brief justification. Return your evaluation in this format:
+RELEVANCE: [score] - [justification]
+ACCURACY: [score] - [justification]
+COMPLETENESS: [score] - [justification] 
+CLARITY: [score] - [justification]
+OVERALL: [average score] - [summary judgment]
+"""
+    
+    def get_user_prompt(
+        self, 
+        user_message: str,
+        bot_response: str,
+        context_data: Optional[Dict[str, Any]] = None,
+        **kwargs
+    ) -> str:
+        """Get the user prompt for evaluation."""
+        context = ""
+        if context_data:
+            context = f"Available football data for reference: {context_data}\n\n"
+        
+        return f"""
+{context}
+User question: {user_message}
+
+Bot response to evaluate: {bot_response}
+
+Evaluate the quality of this response based on the criteria in your instructions.
+"""
+
 # Template registry to store and retrieve templates
 TEMPLATES = {
     "football_conversation": FootballConversationTemplate(),
     "relevance_check": RelevanceCheckTemplate(),
+    "response_evaluation": ResponseEvaluationTemplate(),
 }
 
 

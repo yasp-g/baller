@@ -1,4 +1,5 @@
 import os
+import time
 import inspect
 import logging
 import anthropic
@@ -17,6 +18,7 @@ from .prompt_templates import (
     get_template,
     TEMPLATES
 )
+from .evaluation import create_default_metrics, MetricCategory
 
 # class LLMClient:
 #     def __init__(self):
@@ -63,6 +65,10 @@ class LLMClient:
         self.commands = None
         self.api_errors = []
         self.command_errors = []
+        
+        # Initialize metrics tracker
+        self.metrics = create_default_metrics()
+        
         self.logger.debug(f"LLMClient initialized with provider: {self.provider_type.name}")
     
     def _detect_provider(self) -> ProviderType:
@@ -291,22 +297,129 @@ class LLMClient:
             PromptError: When there's an issue with the prompt
             ResponseError: When there's an issue processing the response
         """
-        if not user_message:
-            raise PromptError("Empty user message provided")
+        start_time = time.time()
+        error_occurred = False
         
-        # Get conversation template and prepare context
-        template = get_template("football_conversation")
-        # Override provider type to match current client
-        template.provider_type = self.provider_type
+        try:
+            if not user_message:
+                raise PromptError("Empty user message provided")
+            
+            # Get conversation template and prepare context
+            template = get_template("football_conversation")
+            # Override provider type to match current client
+            template.provider_type = self.provider_type
+            
+            # Prepare context data for template
+            context_info = self._prepare_context_data(user_preferences)
+            
+            # Call LLM provider with template
+            response = await self._call_provider(
+                template=template,
+                user_message=user_message,
+                context_data=context_data,
+                temperature=0.7,
+                **context_info
+            )
+            
+            # Record metrics for successful response
+            latency = time.time() - start_time
+            self.metrics.record("response_latency", latency)
+            self.metrics.record("response_length", len(response))
+            self.metrics.record("error_rate", 0)  # 0 = success
+            
+            # Calculate and record a simple relevance score based on football terms
+            football_terms = ["football", "soccer", "team", "match", "league", "player", "goal"]
+            relevance_score = sum(term in response.lower() for term in football_terms) / len(football_terms)
+            self.metrics.record("relevance_score", relevance_score)
+            
+            return response
+            
+        except Exception as e:
+            # Record error metric
+            error_occurred = True
+            self.metrics.record("error_rate", 1)  # 1 = error
+            latency = time.time() - start_time
+            self.metrics.record("response_latency", latency)
+            
+            # Re-raise the exception
+            raise
+            
+    async def evaluate_response(
+        self,
+        user_message: str,
+        bot_response: str,
+        context_data: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Evaluate the quality of a response using the LLM itself.
         
-        # Prepare context data for template
-        context_info = self._prepare_context_data(user_preferences)
+        Args:
+            user_message: The original user message
+            bot_response: The response to evaluate
+            context_data: The same context data used to generate the response
+            
+        Returns:
+            Dictionary containing evaluation scores and feedback
+        """
+        try:
+            # Get evaluation template
+            template = get_template("response_evaluation")
+            template.provider_type = self.provider_type
+            
+            # Call LLM for evaluation
+            evaluation_text = await self._call_provider(
+                template=template,
+                user_message=user_message,
+                bot_response=bot_response,
+                context_data=context_data,
+                temperature=0.3,  # Lower temperature for more consistent evaluation
+                max_tokens=500
+            )
+            
+            # Parse evaluation results
+            evaluation_results = self._parse_evaluation(evaluation_text)
+            
+            # Record metrics from evaluation
+            if "OVERALL" in evaluation_results:
+                self.metrics.record("self_evaluation_score", float(evaluation_results["OVERALL"]["score"]))
+                
+            return evaluation_results
+            
+        except Exception as e:
+            self.logger.error(f"Error evaluating response: {str(e)}")
+            return {"error": str(e)}
+            
+    def _parse_evaluation(self, evaluation_text: str) -> Dict[str, Dict[str, Any]]:
+        """Parse the evaluation response into structured data.
         
-        # Call LLM provider with template
-        return await self._call_provider(
-            template=template,
-            user_message=user_message,
-            context_data=context_data,
-            temperature=0.7,
-            **context_info
-        )
+        Args:
+            evaluation_text: Raw evaluation text from LLM
+            
+        Returns:
+            Structured evaluation data
+        """
+        result = {}
+        
+        # Split by lines and process each evaluation criterion
+        for line in evaluation_text.strip().split("\n"):
+            if ":" not in line:
+                continue
+                
+            # Split criterion and content
+            criterion, content = [x.strip() for x in line.split(":", 1)]
+            
+            # Parse score and justification
+            if "-" in content:
+                score_str, justification = [x.strip() for x in content.split("-", 1)]
+                try:
+                    score = float(score_str)
+                    result[criterion] = {
+                        "score": score,
+                        "justification": justification
+                    }
+                except ValueError:
+                    # If score can't be parsed, store the whole content
+                    result[criterion] = {"content": content}
+            else:
+                result[criterion] = {"content": content}
+        
+        return result
