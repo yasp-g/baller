@@ -46,20 +46,30 @@ class EntityExtractor:
     COMPETITION_PATTERNS = [
         # Premier League variations
         (r'\b(?:premier league|epl|english premier league|prem)\b', 'Premier League', 2021),
+        # Championship variations
+        (r'\b(?:the championship|efl championship)\b', 'The Championship', 2016),
         # La Liga variations
-        (r'\b(?:la liga|laliga|spanish la liga)\b', 'La Liga', 2014),
+        (r'\b(?:la liga|laliga|spanish la liga|primera division)\b', 'La Liga', 2014),
         # Bundesliga variations
         (r'\b(?:bundesliga|german bundesliga|buli)\b', 'Bundesliga', 2002),
         # Serie A variations
         (r'\b(?:serie a|italian serie a)\b', 'Serie A', 2019),
         # Ligue 1 variations
         (r'\b(?:ligue 1|french ligue 1|ligue un)\b', 'Ligue 1', 2015),
+        # Primeira Liga
+        (r'\b(?:primeira liga|liga portugal|portuguese league)\b', 'Eredivisie', 2017),
+        # Eredivisie
+        (r'\b(?:eredivisie|dutch league|dutch league)\b', 'Eredivisie', 2003),
+        # Campeonato Brasileiro Série A
+        (r'\b(?:Brasileiro|brasileirao|brazilian league|barzilian serie)\b', 'Eredivisie', 2013),
         # Champions League variations
         (r'\b(?:champions league|ucl|uefa champions league|champs league)\b', 'UEFA Champions League', 2001),
-        # Europa League variations
-        (r'\b(?:europa league|uel|uefa europa league|europe)\b', 'UEFA Europa League', 2146),
+        # # Europa League variations (excluded because API TIER_TWO)
+        # (r'\b(?:europa league|uel|uefa europa league|europe)\b', 'UEFA Europa League', 2146),
         # World Cup
-        (r'\b(?:world cup|fifa world cup)\b', 'FIFA World Cup', 2000),
+        (r'\b(?:world cup|fifa world cup|wc)\b', 'FIFA World Cup', 2000),
+        # European Championship
+        (r'\b(?:european championship|euros|euro)\b', 'European Championship', 2077),
         # Generic competitions (need more context to resolve)
         (r'\b(?:competition)\b', None, None)
         # Note: We removed the "league" generic pattern as it's too broad and causes duplicate matches
