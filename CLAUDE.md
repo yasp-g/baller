@@ -1,7 +1,13 @@
 # CLAUDE.md - Baller Project Guidelines
 
 ## Build & Test Commands
-- **Run tests**: `uv run python -m pytest tests/` or `uv run python -m tests.test_api` or `uv run python -m tests.test_commands` or `uv run python -m tests.test_llm`
+- **Run all tests**: `uv run python -m pytest tests/`
+- **Run unit tests only**: `uv run python -m pytest tests/unit/`
+- **Run integration tests only**: `uv run python -m pytest tests/integration/`
+- **Run specific test categories**: 
+  - `uv run python -m pytest tests/unit/api/` (API unit tests)
+  - `uv run python -m pytest tests/unit/bot/` (Bot unit tests)
+- **Run a specific test file**: `uv run python -m pytest tests/unit/api/test_llm.py`
 - **Install dependencies**: `uv add --editable .` (project) or `uv add [package]` (single package)
 - **Install dev dependencies**: `uv add --editable --dev ".[dev]"`
 - **Run the app**: `uv run python -m src.main`
