@@ -6,6 +6,86 @@
 - **Install dev dependencies**: `uv add --editable --dev ".[dev]"`
 - **Run the app**: `uv run python -m src.main`
 
+## System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          Discord Bot Interface                          │
+│                               BallerBot                                 │
+└───────────────────────────────────┬─────────────────────────────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              BallerCommands                             │
+│                                                                         │
+│  ┌─────────────────┐  ┌───────────────────┐  ┌──────────────────────┐   │
+│  │  Discord Slash  │  │   Conversational  │  │  User Preferences    │   │
+│  │    Commands     │  │     Interface     │  │      Management      │   │
+│  └─────────────────┘  └─────────┬─────────┘  └──────────────────────┘   │
+└─────────────────────────────────┬─────────────────────────────────────┬─┘
+                                  │                                     │
+                ┌─────────────────┴──────────────────┐                  │
+                ▼                                     ▼                  ▼
+┌──────────────────────────┐      ┌──────────────────────────┐ ┌─────────────────────┐
+│    Intent Processing     │      │      LLM Client           │ │  Preferences Store  │
+│                          │─────▶│                           │ │                     │
+│ ┌────────────────────┐   │      │ ┌─────────────────────┐   │ │  ┌───────────────┐  │
+│ │  Entity Extraction │   │      │ │  Prompt Generation  │   │ │  │ User Settings │  │
+│ └────────────────────┘   │      │ └─────────────────────┘   │ │  └───────────────┘  │
+│ ┌────────────────────┐   │      │ ┌─────────────────────┐   │ │  ┌───────────────┐  │
+│ │ Context Management │   │      │ │ Response Generation │   │ │  │Followed Teams │  │
+│ └────────────────────┘   │      │ └─────────────────────┘   │ │  └───────────────┘  │
+│ ┌────────────────────┐   │      │ ┌─────────────────────┐   │ │  ┌───────────────┐  │
+│ │   Entity Cache     │   │      │ │   Error Tracking    │   │ │  │  AWS Storage  │  │
+│ └────────────────────┘   │      │ └─────────────────────┘   │ │  └───────────────┘  │
+└──────────────┬───────────┘      └──────────────┬───────────┘ └─────────────────────┘
+               │                                 │
+               │                                 │
+               ▼                                 ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            External API Client                          │
+│                                                                         │
+│  ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐    │
+│  │  FootballAPI    │     │  DeepseekAPI    │     │   Cache Layer   │    │
+│  │  (football-data)│     │    (LLM API)    │     │  (Local/AWS)    │    │
+│  └─────────────────┘     └─────────────────┘     └─────────────────┘    │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+## Key Components and Data Flow
+
+| Component | Function | Key Classes | Responsibilities |
+|-----------|----------|-------------|------------------|
+| **Discord Interface** | User interaction | `BallerBot` | Bot initialization, event handling, command registration |
+| **Command Layer** | Process commands | `BallerCommands` | Command registration, message routing, user interaction |
+| **Conversation Management** | Maintain chat context | `ConversationManager` | Track message history, manage timeouts, archive conversations |
+| **User Preferences** | Store user settings | `UserPreferencesManager` | Follow/unfollow teams, notification settings, persist preferences |
+| **Intent System** | Understand user queries | `IntentProcessor`, `EntityExtractor` | Extract entities, detect intents, maintain conversation context |
+| **LLM Client** | Generate responses | `LLMClient` | Format prompts, call LLM APIs, process responses |
+| **Football API** | Fetch football data | `FootballAPI` | Interface with football-data.org API, handle rate limits |
+| **Cache Layer** | Optimize performance | `EntityCache` | Cache API responses, sports entities, reduce API calls |
+
+## Data Flow
+
+1. User sends message to Discord bot
+2. `BallerCommands` processes message
+3. `IntentProcessor` determines user intent & extracts entities
+4. `FootballAPI` fetches relevant football data based on intent
+5. `LLMClient` generates response using:
+   - The user message
+   - Detected intent
+   - Fetched football data 
+   - User preferences
+6. Response sent back to user via Discord
+
+## Storage Systems
+
+| System | Description | Location | Persistence |
+|--------|-------------|----------|-------------|
+| **Conversation History** | User message history | Memory + DynamoDB | TTL-based expiry |
+| **User Preferences** | Teams followed, notification settings | Memory + DynamoDB | Persistent |
+| **Entity Cache** | Teams, competitions, players | Local file cache | TTL-based refresh |
+
 ## Code Style Guidelines
 - **Imports**: Standard lib first, third-party second, relative imports last
 - **Type hints**: Use for function parameters and return types
