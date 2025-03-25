@@ -7,8 +7,8 @@ from src.config import Config
 @pytest.fixture
 def config_mock():
     config = MagicMock(spec=Config)
-    config.aws_enabled = False
-    config.conversation_retention_days = 30
+    config.AWS_ENABLED = False
+    config.CONVERSATION_RETENTION_DAYS = 30
     return config
 
 @pytest.fixture

@@ -15,8 +15,8 @@ class UserPreferencesManager:
     def __init__(self, config: Config):
         self.config = config
         self.preferences: Dict[str, Dict[str, Any]] = {}
-        self.aws_enabled = config.aws_enabled
-        self.ttl_days = config.conversation_retention_days  # Reuse same TTL setting
+        self.aws_enabled = config.AWS_ENABLED
+        self.ttl_days = config.CONVERSATION_RETENTION_DAYS  # Reuse same TTL setting
     
     def get_user_preferences(self, user_id: str) -> Dict[str, Any]:
         """Get preferences for a specific user, loading from AWS if needed."""
@@ -124,7 +124,7 @@ class UserPreferencesManager:
         # Example implementation (commented out until AWS SDK is added):
         # import boto3
         # dynamodb = boto3.resource('dynamodb')
-        # table = dynamodb.Table(self.config.aws_dynamodb_table)
+        # table = dynamodb.Table(self.config.AWS_DYNAMODB_TABLE)
         # 
         # # Convert Set to List for JSON serialization
         # prefs_copy = self.preferences[user_id].copy()
@@ -162,7 +162,7 @@ class UserPreferencesManager:
         # from botocore.exceptions import ClientError
         # 
         # dynamodb = boto3.resource('dynamodb')
-        # table = dynamodb.Table(self.config.aws_dynamodb_table)
+        # table = dynamodb.Table(self.config.AWS_DYNAMODB_TABLE)
         # 
         # try:
         #     response = table.get_item(Key={'user_id': f"PREF_{user_id}"})
