@@ -80,7 +80,7 @@
   - Added probabilistic sampling to evaluate a percentage of responses
   - Integrated metrics visualization with the Discord bot interface
   - Added comprehensive test coverage for evaluation components
-- Support streaming responses for faster user experience
+- ✅ Support streaming responses for faster user experience
 
 ## 3. Football Data Features
 

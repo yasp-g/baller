@@ -3,6 +3,7 @@ import discord
 import asyncio
 import os
 import json
+import time
 from discord.ext import commands
 from typing import Optional, Dict, Any, List, Union
 from ..api.sports import FootballAPI
@@ -405,16 +406,64 @@ class BallerCommands(commands.Cog):
                     elif isinstance(context_data, dict):
                         context_data["intent"] = intent_info
                 
-                response = await self.llm_client.generate_response(
+                # Use streaming response for better user experience
+                response_stream = await self.llm_client.generate_response(
                     content, 
                     context_data,
-                    user_preferences=user_prefs
+                    user_preferences=user_prefs,
+                    stream=True
                 )
+                
+                # Initialize a discord message for streaming updates
+                discord_message = await message.channel.send("*Thinking...*")
+                
+                # For storing the complete response
+                full_response = []
+                response_text = ""
+                buffer = []
+                last_update_time = time.time()
+                
+                # Process streaming chunks
+                async for chunk in response_stream:
+                    # Add chunk to buffer and complete response
+                    buffer.append(chunk)
+                    full_response.append(chunk)
+                    
+                    # Update the message every 0.5 seconds or when buffer reaches certain size
+                    current_time = time.time()
+                    if current_time - last_update_time > 0.5 or len("".join(buffer)) > 100:
+                        response_text += "".join(buffer)
+                        buffer = []
+                        
+                        # Update Discord message (handle message length limits)
+                        if len(response_text) > 2000:
+                            # If we exceed Discord's limit, split into multiple messages
+                            await discord_message.edit(content=response_text[:2000])
+                            discord_message = await message.channel.send(response_text[2000:])
+                            response_text = response_text[2000:]
+                        else:
+                            await discord_message.edit(content=response_text)
+                            
+                        last_update_time = current_time
+                
+                # Final update with any remaining buffer
+                if buffer:
+                    response_text += "".join(buffer)
+                    if len(response_text) > 2000:
+                        await discord_message.edit(content=response_text[:2000])
+                        await message.channel.send(response_text[2000:])
+                    else:
+                        await discord_message.edit(content=response_text)
+                
+                # Final complete response for history and evaluation
+                response = "".join(full_response)
                 logger.debug(f"LLM response generated: {response[:50]}...")
+                
             except LLMException as e:
                 logger.error(f"LLM error: {e}")
                 self.llm_client.record_command_error(e, command="conversation")
                 response = f"Sorry, I encountered an issue with my AI service: {e.message}"
+                await message.channel.send(response)
             except Exception as e:
                 logger.error(f"Unexpected error generating LLM response: {e}")
                 error = CommandError(
@@ -424,24 +473,20 @@ class BallerCommands(commands.Cog):
                 )
                 self.llm_client.record_command_error(error, command="conversation")
                 response = f"Sorry, I encountered an unexpected error: {error.message}"
+                await message.channel.send(response)
             
             # Add bot response to history
             self.conversation_manager.add_message(user_id, "assistant", response)
             
-            # Send the response
-            logger.info(f"Sending response to channel {message.channel.id}")
-            try:
-                await message.channel.send(response)
-                logger.debug("Response sent successfully")
-                
-                # Sample for evaluation (asynchronously, doesn't block user experience)
-                asyncio.create_task(self._evaluate_response_sample(
-                    user_message=content,
-                    bot_response=response,
-                    context_data=context_data
-                ))
-            except Exception as e:
-                logger.error(f"Error sending response: {e}")
+            # Sample for evaluation (asynchronously, doesn't block user experience)
+            logger.info("Scheduling response evaluation")
+            asyncio.create_task(self._evaluate_response_sample(
+                user_message=content,
+                bot_response=response,
+                context_data=context_data
+            ))
+            
+            logger.debug("Response processing completed successfully")
                 
         except Exception as e:
             logger.error(f"Critical error in conversation processing: {e}")

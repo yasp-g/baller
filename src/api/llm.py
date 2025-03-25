@@ -4,7 +4,7 @@ import inspect
 import logging
 import anthropic
 from openai import AsyncOpenAI
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List, Union, AsyncGenerator
 from ..config import config
 from ..exceptions import (
     LLMException,
@@ -171,53 +171,71 @@ class LLMClient:
         self, 
         template: PromptTemplate,
         user_message: str,
+        stream: bool = False,
         **kwargs
-    ) -> str:
+    ) -> Union[str, AsyncGenerator[str, None]]:
         """Call the appropriate LLM provider with the formatted prompt.
         
         Args:
             template: The prompt template to use
             user_message: The user's message
+            stream: Whether to stream the response
             **kwargs: Additional parameters for the template
             
         Returns:
-            The text response from the LLM
+            Either the full text response as a string or an async generator yielding chunks
         """
         formatted_prompt = template.format_for_provider(user_message, **kwargs)
         
         # Set default parameters
         params = {
             "max_tokens": kwargs.get("max_tokens", 1000),
-            "temperature": kwargs.get("temperature", 0.7)
+            "temperature": kwargs.get("temperature", 0.7),
+            "stream": stream
         }
         
         try:
             if self.provider_type == ProviderType.OPENAI:
                 # OpenAI/Deepseek API format
-                response = await self.client.chat.completions.create(
-                    model=kwargs.get("model", "deepseek-chat"),
-                    messages=formatted_prompt["messages"],
-                    **params
-                )
-                
-                if not response.choices or not response.choices[0].message:
-                    raise ResponseError("Empty response received from LLM")
+                if stream:
+                    return self._stream_openai_response(
+                        model=kwargs.get("model", "deepseek-chat"),
+                        messages=formatted_prompt["messages"],
+                        **params
+                    )
+                else:
+                    response = await self.client.chat.completions.create(
+                        model=kwargs.get("model", "deepseek-chat"),
+                        messages=formatted_prompt["messages"],
+                        **params
+                    )
                     
-                return response.choices[0].message.content
+                    if not response.choices or not response.choices[0].message:
+                        raise ResponseError("Empty response received from LLM")
+                        
+                    return response.choices[0].message.content
                 
             elif self.provider_type == ProviderType.ANTHROPIC:
                 # Anthropic API format
-                response = await self.client.messages.create(
-                    model=kwargs.get("model", "claude-3-opus-20240229"),
-                    system=formatted_prompt["system"],
-                    messages=formatted_prompt["messages"],
-                    **params
-                )
-                
-                if not response.content or not response.content[0].text:
-                    raise ResponseError("Empty response received from LLM")
+                if stream:
+                    return self._stream_anthropic_response(
+                        model=kwargs.get("model", "claude-3-opus-20240229"),
+                        system=formatted_prompt["system"],
+                        messages=formatted_prompt["messages"],
+                        **params
+                    )
+                else:
+                    response = await self.client.messages.create(
+                        model=kwargs.get("model", "claude-3-opus-20240229"),
+                        system=formatted_prompt["system"],
+                        messages=formatted_prompt["messages"],
+                        **params
+                    )
                     
-                return response.content[0].text
+                    if not response.content or not response.content[0].text:
+                        raise ResponseError("Empty response received from LLM")
+                        
+                    return response.content[0].text
                 
             else:
                 raise ValueError(f"Unsupported provider type: {self.provider_type}")
@@ -244,6 +262,64 @@ class LLMClient:
             self.logger.error(f"Unexpected error in LLM response generation: {str(e)}")
             raise LLMException(
                 message="Unexpected error in LLM response generation",
+                details={"original_error": str(e)}
+            ) from e
+            
+    async def _stream_openai_response(self, model: str, messages: List[Dict[str, Any]], **kwargs) -> AsyncGenerator[str, None]:
+        """Stream responses from OpenAI/Deepseek API.
+        
+        Args:
+            model: The model to use
+            messages: The messages to send
+            **kwargs: Additional parameters for the API call
+            
+        Yields:
+            Chunks of the response as they arrive
+        """
+        try:
+            response_stream = await self.client.chat.completions.create(
+                model=model,
+                messages=messages,
+                **kwargs
+            )
+            
+            async for chunk in response_stream:
+                if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        except Exception as e:
+            self.logger.error(f"Error in OpenAI streaming: {str(e)}")
+            raise LLMException(
+                message="Error in streaming response",
+                details={"original_error": str(e)}
+            ) from e
+    
+    async def _stream_anthropic_response(self, model: str, system: str, messages: List[Dict[str, Any]], **kwargs) -> AsyncGenerator[str, None]:
+        """Stream responses from Anthropic API.
+        
+        Args:
+            model: The model to use
+            system: The system message
+            messages: The messages to send
+            **kwargs: Additional parameters for the API call
+            
+        Yields:
+            Chunks of the response as they arrive
+        """
+        try:
+            response_stream = await self.client.messages.create(
+                model=model,
+                system=system,
+                messages=messages,
+                **kwargs
+            )
+            
+            async for chunk in response_stream:
+                if chunk.type == "content_block_delta" and chunk.delta.text:
+                    yield chunk.delta.text
+        except Exception as e:
+            self.logger.error(f"Error in Anthropic streaming: {str(e)}")
+            raise LLMException(
+                message="Error in streaming response",
                 details={"original_error": str(e)}
             ) from e
     
@@ -280,17 +356,19 @@ class LLMClient:
         self, 
         user_message: str, 
         context_data: Optional[Dict[str, Any]] = None,
-        user_preferences: Optional[Dict[str, Any]] = None
-    ) -> str:
+        user_preferences: Optional[Dict[str, Any]] = None,
+        stream: bool = False
+    ) -> Union[str, AsyncGenerator[str, None]]:
         """Generate a conversational response using the configured LLM.
         
         Args:
             user_message: The user's question or message
             context_data: Optional context data to include in the prompt
             user_preferences: Optional user preferences to personalize the response
+            stream: Whether to stream the response in chunks
             
         Returns:
-            Generated text response from the LLM
+            Either the full response as a string or an async generator yielding chunks
             
         Raises:
             ModelUnavailableError: When the LLM service is unavailable
@@ -312,27 +390,38 @@ class LLMClient:
             # Prepare context data for template
             context_info = self._prepare_context_data(user_preferences)
             
-            # Call LLM provider with template
-            response = await self._call_provider(
-                template=template,
-                user_message=user_message,
-                context_data=context_data,
-                temperature=0.7,
-                **context_info
-            )
-            
-            # Record metrics for successful response
-            latency = time.time() - start_time
-            self.metrics.record("response_latency", latency)
-            self.metrics.record("response_length", len(response))
-            self.metrics.record("error_rate", 0)  # 0 = success
-            
-            # Calculate and record a simple relevance score based on football terms
-            football_terms = ["football", "soccer", "team", "match", "league", "player", "goal"]
-            relevance_score = sum(term in response.lower() for term in football_terms) / len(football_terms)
-            self.metrics.record("relevance_score", relevance_score)
-            
-            return response
+            if stream:
+                # Return a streaming generator
+                return self._stream_response_with_metrics(
+                    template=template,
+                    user_message=user_message,
+                    context_data=context_data,
+                    start_time=start_time,
+                    temperature=0.7,
+                    **context_info
+                )
+            else:
+                # Call LLM provider with template (non-streaming)
+                response = await self._call_provider(
+                    template=template,
+                    user_message=user_message,
+                    context_data=context_data,
+                    temperature=0.7,
+                    **context_info
+                )
+                
+                # Record metrics for successful response
+                latency = time.time() - start_time
+                self.metrics.record("response_latency", latency)
+                self.metrics.record("response_length", len(response))
+                self.metrics.record("error_rate", 0)  # 0 = success
+                
+                # Calculate and record a simple relevance score based on football terms
+                football_terms = ["football", "soccer", "team", "match", "league", "player", "goal"]
+                relevance_score = sum(term in response.lower() for term in football_terms) / len(football_terms)
+                self.metrics.record("relevance_score", relevance_score)
+                
+                return response
             
         except Exception as e:
             # Record error metric
@@ -343,6 +432,64 @@ class LLMClient:
             
             # Re-raise the exception
             raise
+            
+    async def _stream_response_with_metrics(
+        self,
+        template: PromptTemplate,
+        user_message: str,
+        start_time: float,
+        **kwargs
+    ) -> AsyncGenerator[str, None]:
+        """Stream a response and track metrics.
+        
+        Args:
+            template: The prompt template to use
+            user_message: The user's message
+            start_time: When the request started (for latency calculation)
+            **kwargs: Additional parameters for the template
+            
+        Yields:
+            Chunks of the response as they arrive
+        """
+        full_response = []
+        try:
+            # Call provider with streaming enabled
+            stream_gen = await self._call_provider(
+                template=template,
+                user_message=user_message,
+                stream=True,
+                **kwargs
+            )
+            
+            # Yield each chunk as it comes in
+            async for chunk in stream_gen:
+                full_response.append(chunk)
+                yield chunk
+                
+            # Record metrics after complete response
+            latency = time.time() - start_time
+            full_text = "".join(full_response)
+            
+            self.metrics.record("response_latency", latency)
+            self.metrics.record("response_length", len(full_text))
+            self.metrics.record("error_rate", 0)  # 0 = success
+            
+            # Calculate and record a simple relevance score based on football terms
+            football_terms = ["football", "soccer", "team", "match", "league", "player", "goal"]
+            relevance_score = sum(term in full_text.lower() for term in football_terms) / len(football_terms)
+            self.metrics.record("relevance_score", relevance_score)
+            
+        except Exception as e:
+            # Record error metrics
+            self.metrics.record("error_rate", 1)  # 1 = error
+            latency = time.time() - start_time
+            self.metrics.record("response_latency", latency)
+            
+            # Re-raise the exception
+            raise LLMException(
+                message="Error in streaming response",
+                details={"original_error": str(e)}
+            ) from e
             
     async def evaluate_response(
         self,
