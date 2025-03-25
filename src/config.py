@@ -57,6 +57,12 @@ class Config:
     EVALUATION_SAMPLING_RATE = float(get_env("EVALUATION_SAMPLING_RATE", "1.0" if ENV == "development" else "0.05"))
     EVALUATION_MAX_DAILY_SAMPLES = int(get_env("EVALUATION_MAX_DAILY_SAMPLES", "100"))
     
+    # Feedback Collection
+    COLLECT_REACTION_FEEDBACK = get_env("COLLECT_REACTION_FEEDBACK", "true" if ENV == "development" else "false").lower() in ("true", "1", "yes")
+    REACTION_POSITIVE = "👍"
+    REACTION_NEGATIVE = "👎"
+    FEEDBACK_PROMPT = get_env("FEEDBACK_PROMPT", "This bot is in development. Please rate this response with 👍 or 👎")
+    
     @classmethod
     def validate(cls) -> bool:
         """Validate that all required configuration is present"""

@@ -93,6 +93,56 @@ class BallerCommands(commands.Cog):
         else:
             logger.debug(f"Ignoring non-conversational message: {message.content[:30]}...")
     
+    @commands.Cog.listener()
+    async def on_reaction_add(self, reaction, user):
+        """Handle reactions to bot messages as feedback."""
+        # Ignore reactions from the bot itself
+        if user == self.bot.user:
+            return
+            
+        # Check if this is a feedback reaction on a bot message
+        from ..config import config
+        if reaction.message.author == self.bot.user:
+            emoji = str(reaction.emoji)
+            
+            if emoji == config.REACTION_POSITIVE:
+                # Positive feedback (score 8/10)
+                logger.info(f"Received positive feedback reaction from {user.name} (ID: {user.id})")
+                self.llm_client.metrics.record("user_feedback_score", 8.0)
+                
+                # Record detailed feedback
+                feedback = {
+                    "user_id": str(user.id),
+                    "message_id": str(reaction.message.id),
+                    "rating": 8,
+                    "reaction": emoji,
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                # Store the feedback
+                if not hasattr(self, 'user_feedback'):
+                    self.user_feedback = []
+                self.user_feedback.append(feedback)
+                
+            elif emoji == config.REACTION_NEGATIVE:
+                # Negative feedback (score 3/10)
+                logger.info(f"Received negative feedback reaction from {user.name} (ID: {user.id})")
+                self.llm_client.metrics.record("user_feedback_score", 3.0)
+                
+                # Record detailed feedback
+                feedback = {
+                    "user_id": str(user.id),
+                    "message_id": str(reaction.message.id),
+                    "rating": 3,
+                    "reaction": emoji,
+                    "timestamp": datetime.now().isoformat()
+                }
+                
+                # Store the feedback
+                if not hasattr(self, 'user_feedback'):
+                    self.user_feedback = []
+                self.user_feedback.append(feedback)
+    
     async def process_conversation(self, message, content):
         """Process a conversational message using the LLM and football-data API"""
         user_id = str(message.author.id)
@@ -454,13 +504,26 @@ class BallerCommands(commands.Cog):
                 # Final update with any remaining buffer
                 if buffer:
                     response_text += "".join(buffer)
+                    
+                    # Add feedback prompt if configured
+                    from ..config import config
+                    if config.COLLECT_REACTION_FEEDBACK:
+                        feedback_note = f"\n\n_{config.FEEDBACK_PROMPT}_"
+                        if len(response_text) + len(feedback_note) <= 2000:
+                            response_text += feedback_note
+                    
                     if len(response_text) > 2000:
                         await discord_message.edit(content=response_text[:2000])
                         await message.channel.send(response_text[2000:])
                     else:
                         await discord_message.edit(content=response_text)
+                    
+                    # Add reaction emoji for feedback if configured
+                    if config.COLLECT_REACTION_FEEDBACK:
+                        await discord_message.add_reaction(config.REACTION_POSITIVE)
+                        await discord_message.add_reaction(config.REACTION_NEGATIVE)
                 
-                # Final complete response for history and evaluation
+                # Final complete response for history and evaluation (without feedback prompt)
                 response = "".join(full_response)
                 logger.debug(f"LLM response generated: {response[:50]}...")
                 
