@@ -15,10 +15,54 @@ This directory contains the Terraform configuration for Baller's AWS infrastruct
     /staging/              # Staging environment
     /prod/                 # Production environment
   main.tf                  # Main Terraform configuration
-  variables.tf             # Variable definitions
+  variables.tf             # Global variable definitions
   outputs.tf               # Output definitions
+  terraform.tfvars.example # Example variable values
+  state.config.example     # Example backend configuration
   README.md                # This file
 ```
+
+## Variable Management Structure
+
+The Terraform configuration uses a hierarchical variable management approach:
+
+```
+terraform/
+  variables.tf             # Global variables with defaults
+  terraform.tfvars.example # Default values examples (gitignored)
+  
+  modules/
+    database/
+      variables.tf         # Database-specific variables
+      
+    storage/
+      variables.tf         # Storage-specific variables
+      
+    search/
+      variables.tf         # Search-specific variables
+      
+  environments/
+    dev/
+      main.tf              # Dev-specific module references
+      terraform.tfvars.example # Dev-specific example values
+    
+    staging/
+      main.tf              # Staging-specific module references
+      terraform.tfvars.example # Staging-specific example values
+      
+    prod/
+      main.tf              # Production-specific module references
+      terraform.tfvars.example # Production-specific example values
+```
+
+### Variable Precedence
+
+Variables follow this precedence (highest to lowest):
+1. Environment-specific terraform.tfvars
+2. Values explicitly set in environment's main.tf
+3. Root terraform.tfvars
+4. Default values in module's variables.tf
+5. Default values in root variables.tf
 
 ## Modules
 
