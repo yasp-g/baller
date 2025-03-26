@@ -1,11 +1,11 @@
 # ROADMAP
 
 ## Progress Summary
-- **Last Updated**: March 25, 2025
+- **Last Updated**: March 26, 2025
 - **Core Infrastructure**: 92% complete (Configuration system, logging, testing, error handling, memory management)
-- **NLP Enhancements**: 90% complete (Conversation management, intent detection, prompt templates, content filtering, response evaluation)
+- **NLP Enhancements**: 95% complete (Conversation management, intent detection, prompt templates, content filtering, response evaluation, streaming responses)
 - **Football Data Features**: 0% complete
-- **User Experience**: 25% complete (User preferences, team following)
+- **User Experience**: 40% complete (User preferences, team following, feedback collection)
 - **Scalability**: 10% complete (AWS integration foundation)
 
 ## Next Steps
@@ -16,7 +16,10 @@
 5. ✅ Implement intent detection system for better query understanding
 6. ✅ Implement content filtering for improved relevance and safety
 7. ✅ Standardize prompt templates across different LLM providers
-8. Implement caching for frequently accessed football data
+8. Reevaluate pyproject.toml and esnure it aligns with `uv` best practices
+    - I'm not sure `[project.optional-dependencies]` is the best when `uv` has a built-in development dependencies workflow (`[dependency-groups]`)
+9. Implement caching for frequently accessed football data
+
 
 ## 1. Core Infrastructure Improvements
 
@@ -78,9 +81,14 @@
   - Implemented metrics tracking system for latency, relevance, and error rates
   - Created LLM-based self-evaluation system with detailed quality criteria
   - Added probabilistic sampling to evaluate a percentage of responses
-  - Integrated metrics visualization with the Discord bot interface
+  - Implemented user feedback collection via Discord UI buttons
+  - Integrated feedback with metrics visualization in the Discord interface
   - Added comprehensive test coverage for evaluation components
 - ✅ Support streaming responses for faster user experience
+  - Implemented streaming for both Anthropic and OpenAI/Deepseek providers
+  - Added real-time message updates as responses are generated
+  - Created buffer system to manage Discord message updates efficiently
+  - Optimized user experience with immediate partial responses
 
 ## 3. Football Data Features
 
@@ -110,6 +118,11 @@
   - Added team preferences storage with AWS integration architecture
   - Enhanced `!matches` command to support filtering by followed teams
   - Added notification preference settings for future game reminders
+- ✅ Add feedback collection system
+  - Implemented button-based feedback interface in Discord UI
+  - Created configurable environment modes (development, beta, production)
+  - Added metrics tracking for user feedback scores
+  - Feedback metrics integrated with existing evaluation system
 - Implement notification system for match events
 - Support customization of data presentation
 - Add user-specific command shortcuts

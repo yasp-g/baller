@@ -9,6 +9,10 @@
 - **Run in development mode**: `uv run python -m src.main`
 - **Run in beta mode**: `APP_MODE=beta uv run python -m src.main` (enables feedback buttons)
 - **Run in production mode**: `APP_MODE=production ENV=production uv run python -m src.main`
+- **Customize feedback collection**: 
+  - Disable feedback: `COLLECT_FEEDBACK=false uv run python -m src.main`
+  - Customize prompt: `FEEDBACK_PROMPT="Rate my response!" uv run python -m src.main`
+  - Customize button labels: `FEEDBACK_POSITIVE_LABEL="👍 Great!" FEEDBACK_NEGATIVE_LABEL="👎 Needs work" uv run python -m src.main`
 - **Run with detailed logging**: `LOG_LEVEL=DEBUG uv run python -m src.main | jq -r '. | "\(.timestamp) [\(.level)] \(.logger): \(.message)"'`
 
 ### Tests
