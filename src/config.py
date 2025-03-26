@@ -66,7 +66,7 @@ class Config:
     EVALUATION_MAX_DAILY_SAMPLES = int(get_env("EVALUATION_MAX_DAILY_SAMPLES", "100"))
     
     # Feedback Collection
-    COLLECT_FEEDBACK = get_env("COLLECT_FEEDBACK", "true" if APP_MODE in [MODE_DEVELOPMENT, MODE_BETA] else "false").lower() in ("true", "1", "yes")
+    COLLECT_FEEDBACK = get_env("COLLECT_FEEDBACK", "true" if APP_MODE == MODE_BETA else "false").lower() in ("true", "1", "yes")
     FEEDBACK_PROMPT = get_env("FEEDBACK_PROMPT", "🧪 Beta phase: How was this response?")
     FEEDBACK_POSITIVE_LABEL = get_env("FEEDBACK_POSITIVE_LABEL", "Good bot")
     FEEDBACK_NEGATIVE_LABEL = get_env("FEEDBACK_NEGATIVE_LABEL", "Bad bot")
