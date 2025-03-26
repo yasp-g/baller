@@ -1,0 +1,7 @@
+# Example state configuration for Scalr
+# Copy to state.config in your environment directory and replace with your values
+# This file should NOT be committed to git
+
+hostname     = "username.scalr.io"
+organization = "env-123456789"
+workspaces   = { name = "baller-ENVIRONMENT" }  # Replace ENVIRONMENT with dev, staging, or prod
