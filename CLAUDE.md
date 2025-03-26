@@ -141,6 +141,15 @@
 - `/tests/`: Integration tests for each module
 - `/docs/`: Documentation files
   - `/docs/DATABASE_PLAN.md`: Comprehensive database schema and storage strategy
+- `/terraform/`: Infrastructure as Code
+  - `/terraform/modules/`: Reusable Terraform configurations
+    - `/terraform/modules/database/`: DynamoDB tables configuration
+    - `/terraform/modules/storage/`: S3 buckets configuration
+    - `/terraform/modules/search/`: OpenSearch configuration
+  - `/terraform/environments/`: Environment-specific configurations
+    - `/terraform/environments/dev/`: Development environment
+    - `/terraform/environments/staging/`: Staging environment
+    - `/terraform/environments/prod/`: Production environment
 
 ## Commit Guidelines
 - **Atomic commits**: Each commit should represent a single logical change
@@ -151,18 +160,26 @@
   <optional body>
   ```
 - **Types**: feat, fix, docs, style, refactor, test, chore
-- **Scopes**: api, bot, config, llm, test, deps, infra
+- **Scopes**: api, bot, config, llm, test, deps, infra, database
 - **Examples**:
   - `feat(api): Add team player stats endpoint`
   - `fix(bot): Handle missing data in conversation response`
   - `refactor(llm): Standardize prompt templates`
+  - `feat(infra): Set up Terraform configuration for AWS resources`
+  - `docs(database): Create database schema documentation`
 - **First line**: Maximum 72 characters, no period at end
 - **Body**: Optional, used for explaining complex changes or breaking changes
 - **Pull requests**: Should reference related issues with "Fixes #123" or "Addresses #123"
 
 ## General Notes
 - **Deployment Infrastructure**: AWS services will be used to deploy and support the application
-  - Terraform will be used for managing infrastructure as code
+  - Terraform manages all infrastructure as code using a modular approach
+  - Infrastructure components include:
+    - DynamoDB for structured data (conversations, user preferences, metadata)
+    - S3 for large object storage (API responses, LLM interactions)
+    - OpenSearch for analytics and searching conversation data
+  - Each environment (dev, staging, prod) has independent configurations
+  - Scalr is used as the Terraform state backend
 
 ## Monitoring & Debugging
 
