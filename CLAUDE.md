@@ -119,11 +119,33 @@
 
 ## Storage Systems
 
-| System | Description | Location | Persistence |
-|--------|-------------|----------|-------------|
-| **Conversation History** | User message history | Memory + DynamoDB | TTL-based expiry |
-| **User Preferences** | Teams followed, notification settings | Memory + DynamoDB | Persistent |
-| **Entity Cache** | Teams, competitions, players | Local file cache | TTL-based refresh |
+A comprehensive database design is available in [/docs/DATABASE_PLAN.md](./docs/DATABASE_PLAN.md).
+
+### Primary Storage Systems
+
+| System | Description | Location | Persistence | Key Design |
+|--------|-------------|----------|-------------|------------|
+| **Conversation History** | User message history | Memory + DynamoDB | TTL-based expiry (30 days) | PK: user_id, SK: conversation_id |
+| **Message Data** | Individual messages with processing data | DynamoDB + S3 | TTL-based expiry (30 days) | PK: conversation_id, SK: message_id |
+| **User Preferences** | Teams followed, notification settings | Memory + DynamoDB | Persistent | PK: user_id, SK: server_id |
+| **Entity Cache** | Teams, competitions, players | Local + DynamoDB | TTL-based refresh (7 days) | PK: entity_type, SK: entity_id |
+
+### Analytics & Processing Data
+
+| System | Description | Location | Persistence | Key Design |
+|--------|-------------|----------|-------------|------------|
+| **API Interactions** | API call data and responses | DynamoDB + S3 | TTL-based expiry (7 days) | PK: message_id, SK: api_call_id |
+| **LLM Interactions** | Prompts, generations, metrics | DynamoDB + S3 | TTL-based expiry (7 days) | PK: message_id, SK: llm_call_id |
+| **User Feedback** | Explicit feedback on responses | DynamoDB | Persistent | PK: message_id |
+| **Metrics** | System performance metrics | DynamoDB | Daily aggregation | PK: metric_date, SK: metric_id |
+
+### Backend Storage Technologies
+
+| Technology | Purpose | Components | Data Type |
+|------------|---------|------------|-----------|
+| **DynamoDB** | Structured data storage | Tables with GSIs | JSON-compatible data |
+| **S3** | Large object storage | Buckets with lifecycle rules | Raw responses, prompts, contexts |
+| **OpenSearch** | Analytics and searching | Domain with dedicated nodes | Indexed conversation data |
 
 ## Code Style Guidelines
 - **Imports**: Standard lib first, third-party second, relative imports last
