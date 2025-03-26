@@ -276,16 +276,60 @@ docker build -t baller-bot .
 docker run -e DISCORD_TOKEN=xxx -e FOOTBALL_DATA_API_KEY=xxx -e DEEPSEEK_API_KEY=xxx baller-bot
 ```
 
-## AWS Integration
+## AWS Infrastructure & Integration
+
+### AWS Resources (Managed by Terraform)
+
+#### DynamoDB Tables
+- **Core Data**:
+  - `baller-conversations`: User message history with user_id/conversation_id keys
+  - `baller-messages`: Individual messages with conversation_id/message_id keys
+  - `baller-preferences`: User settings with user_id/server_id keys
+- **Operational Data**:
+  - `baller-api-interactions`: API call tracking with message_id/api_call_id keys
+  - `baller-llm-interactions`: LLM usage tracking with message_id/llm_call_id keys
+- **Analytics & Cache**:
+  - `baller-feedback`: User feedback storage with message_id primary key
+  - `baller-entity-cache`: Entity reference data with entity_type/entity_id keys
+  - `baller-metrics`: Performance metrics with metric_date/metric_id keys
+
+#### S3 Buckets
+- `baller-api-responses`: Complete API responses and raw data
+- `baller-llm-interactions`: Full prompts, contexts, and responses
+- `baller-message-contexts`: Complete conversation contexts
+- All buckets include:
+  - Server-side encryption (AES-256)
+  - Lifecycle rules for cost management
+  - Access control policies
+  - Versioning for data protection
+
+#### OpenSearch Domain
+- `baller-search`: Analytics and full-text search capabilities
+  - Sized appropriately for each environment
+  - Encrypted communication and storage
+  - Automated maintenance and updates
+  - Kibana dashboards for visualization
+
+### Application Integration
+
 - **Configuration**: Enable AWS integration with `AWS_ENABLED=true` environment variable
 - **DynamoDB Integration**: 
   - Conversations are stored using user_id as the partition key
   - Automatic expiry using DynamoDB TTL feature (set with `CONVERSATION_RETENTION_DAYS`)
   - Serialized data includes conversation history, metadata, and timestamps
-  - User preferences stored in the same table with different prefix (PREF_)
-  - Common data model with TTL and last_updated timestamps
+  - User preferences stored with user_id/server_id keys for server-specific settings
   
-### CloudWatch Integration
+- **Integration Points**:
+  - `src/bot/conversation.py`: Contains AWS integration hooks for conversation storage
+    - `_archive_conversation()`: Archives conversations to DynamoDB (awaiting implementation)
+    - `_try_load_from_aws()`: Loads previous conversations from DynamoDB (awaiting implementation)
+  - `src/bot/preferences.py`: Contains AWS integration hooks for user preferences
+    - `_archive_preferences()`: Archives preferences to DynamoDB (awaiting implementation)
+    - `_try_load_from_aws()`: Loads preferences from DynamoDB (awaiting implementation)
+
+### Monitoring & Logging
+
+#### CloudWatch Integration
 - JSON-formatted logs are compatible with CloudWatch Logs Insights
 - Sample queries:
   ```
@@ -306,25 +350,15 @@ docker run -e DISCORD_TOKEN=xxx -e FOOTBALL_DATA_API_KEY=xxx -e DEEPSEEK_API_KEY
   | sort activity desc
   ```
 
-- **Integration Points**:
-  - `src/bot/conversation.py`: Contains AWS integration hooks for conversation storage
-    - `_archive_conversation()`: Archives conversations to DynamoDB (currently placeholder)
-    - `_try_load_from_aws()`: Loads previous conversations from DynamoDB (currently placeholder)
-  - `src/bot/preferences.py`: Contains AWS integration hooks for user preferences
-    - `_archive_preferences()`: Archives preferences to DynamoDB (currently placeholder)
-    - `_try_load_from_aws()`: Loads preferences from DynamoDB (currently placeholder)
+### Implementation Roadmap
 
-- **DynamoDB Schema Design**:
-  - Partition key: `user_id` (with prefix for data type: CONV_ or PREF_)
-  - Sort key: Not used in current schema (reserved for future extensions)
-  - Data stored as serialized JSON in a `data` attribute
-  - TTL attribute for automatic cleanup
-  - `last_updated` timestamp for synchronization
-  
-- **Future Work**:
-  - Implement actual AWS SDK calls (boto3) in the placeholder methods
-  - Add AWS credentials configuration in config.py
-  - Set up CloudWatch metrics for conversation statistics and user engagement
-  - Implement S3 storage for large conversation contexts
-  - Add GSI for team-based lookups (to find all users following a specific team)
-  - Create AWS CDK/CloudFormation template for easy resource provisioning
+1. **Complete Infrastructure** ✅
+   - Define all required AWS resources in Terraform ✅
+   - Configure security settings and access policies ✅
+   - Set up environment-specific configurations ✅
+
+2. **Next Steps**:
+   - Implement boto3 integration in conversation.py and preferences.py
+   - Add AWS credentials configuration in config.py
+   - Set up CloudWatch metrics for conversation statistics
+   - Create deployment pipeline for infrastructure
