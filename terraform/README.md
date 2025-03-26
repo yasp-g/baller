@@ -68,30 +68,93 @@ Variables follow this precedence (highest to lowest):
 
 ### Database Module
 
-Creates and configures the DynamoDB tables as defined in the [Database Plan](/docs/DATABASE_PLAN.md):
+Creates and configures DynamoDB tables as defined in the [Database Plan](/docs/DATABASE_PLAN.md):
 
+#### Core Data Tables
 - `baller-conversations` - Stores user conversation data
-- `baller-messages` - Stores individual message data with processing metadata
+  - Partition Key: `user_id`, Sort Key: `conversation_id`
+  - GSIs: `ServerIndex`, `CreatedAtIndex`
+  - TTL-based expiry
+
+- `baller-messages` - Stores individual message data
+  - Partition Key: `conversation_id`, Sort Key: `message_id`
+  - GSIs: `UserMessageIndex`, `IntentIndex`
+  - Tracks processing metadata and references to S3 objects
+
 - `baller-preferences` - Stores user preferences and settings
-- `baller-api-interactions` - Tracks API calls
-- `baller-llm-interactions` - Tracks LLM usage
-- `baller-feedback` - Stores user feedback
-- `baller-entity-cache` - Caches entity data
-- `baller-metrics` - Stores application metrics
+  - Partition Key: `user_id`, Sort Key: `server_id`
+  - GSI: `ServerIndex`
+  - Persistent storage (no TTL)
+
+#### API & LLM Interaction Tables
+- `baller-api-interactions` - Tracks API calls with metadata
+  - Partition Key: `message_id`, Sort Key: `api_call_id`
+  - GSI: `EndpointIndex`
+  - Links to S3 for complete response storage
+
+- `baller-llm-interactions` - Tracks LLM usage and responses
+  - Partition Key: `message_id`, Sort Key: `llm_call_id`
+  - GSIs: `ProviderModelIndex`, `PurposeIndex`
+  - Performance metrics and token usage
+
+#### Analytics & Cache Tables
+- `baller-feedback` - Stores user feedback on responses
+  - Partition Key: `message_id`
+  - GSIs: `UserFeedbackIndex`, `AppModeIndex`
+  - Persistent storage for long-term analysis
+
+- `baller-entity-cache` - Caches entity data (teams, competitions)
+  - Partition Key: `entity_type`, Sort Key: `entity_id`
+  - GSI: `NameIndex`
+  - TTL-based refresh mechanism
+
+- `baller-metrics` - Stores application performance metrics
+  - Partition Key: `metric_date`, Sort Key: `metric_id`
+  - GSIs: `CategoryIndex`, `AppModeIndex`
+  - Persistent storage for historical analysis
+
+All tables include:
+- Environment and project namespacing
+- Server-side encryption
+- Point-in-time recovery
+- Consistent tagging
+- Capacity scaling based on environment needs
 
 ### Storage Module
 
-Creates S3 buckets for storing larger objects:
+Creates S3 buckets with security best practices and lifecycle management:
 
 - `baller-api-responses` - Stores complete API responses
-- `baller-llm-interactions` - Stores complete LLM prompts and responses
-- `baller-message-contexts` - Stores complete message context data
+  - Server-side encryption (AES-256)
+  - Lifecycle rules for cost optimization:
+    - Standard → IA (30 days)
+    - IA → Glacier (90 days)
+    - Expiration (365 days)
+  - Public access blocked
+  - Versioning for data protection
+
+- `baller-llm-interactions` - Stores complete LLM interactions
+  - Identical security and lifecycle configuration
+  - Maintains full context of prompts and responses
+  - Preserves token-level details for analysis
+
+- `baller-message-contexts` - Stores complete message contexts
+  - Identical security and lifecycle configuration
+  - Stores data that would be too large for DynamoDB
+  - Enables complete conversation reconstruction
 
 ### Search Module
 
-Configures Amazon OpenSearch Service for search and analytics:
+Configures Amazon OpenSearch Service for sophisticated search and analytics:
 
-- `baller-search` - OpenSearch domain for conversation and feedback analysis
+- `baller-search` - OpenSearch domain with:
+  - Size-appropriate instances based on environment
+  - EBS storage with automatic scaling
+  - Multi-AZ deployment in production
+  - Encryption at rest and in transit
+  - Automated maintenance windows
+  - Blue/green deployment for zero-downtime updates
+  - Kibana dashboard access for visualization
 
 ## Environment-Specific Configuration
 
