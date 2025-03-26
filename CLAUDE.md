@@ -139,6 +139,8 @@
 - `/src/api/`: External API integrations
 - `/src/bot/`: Discord bot functionality 
 - `/tests/`: Integration tests for each module
+- `/docs/`: Documentation files
+  - `/docs/DATABASE_PLAN.md`: Comprehensive database schema and storage strategy
 
 ## Commit Guidelines
 - **Atomic commits**: Each commit should represent a single logical change
