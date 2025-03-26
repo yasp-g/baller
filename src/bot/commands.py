@@ -97,7 +97,8 @@ class BallerCommands(commands.Cog):
     # Feedback view for button interactions
     class FeedbackView(ui.View):
         def __init__(self, commands_instance):
-            super().__init__(timeout=None)  # Buttons don't time out
+            # No timeout so buttons remain active indefinitely
+            super().__init__(timeout=None)
             self.commands = commands_instance
             self.config = config
             
@@ -105,16 +106,19 @@ class BallerCommands(commands.Cog):
             positive_style = ButtonStyle(int(self.config.FEEDBACK_POSITIVE_STYLE))
             negative_style = ButtonStyle(int(self.config.FEEDBACK_NEGATIVE_STYLE))
             
+            # Create more minimal buttons
             self.add_item(ui.Button(
                 style=positive_style, 
                 label=self.config.FEEDBACK_POSITIVE_LABEL,
-                custom_id="feedback_positive"
+                custom_id="feedback_positive",
+                row=0  # Put both buttons on the same row to save space
             ))
             
             self.add_item(ui.Button(
                 style=negative_style, 
                 label=self.config.FEEDBACK_NEGATIVE_LABEL,
-                custom_id="feedback_negative"
+                custom_id="feedback_negative",
+                row=0  # Put both buttons on the same row to save space
             ))
         
     @commands.Cog.listener()
@@ -148,8 +152,8 @@ class BallerCommands(commands.Cog):
                 self.user_feedback = []
             self.user_feedback.append(feedback)
             
-            # Acknowledge the interaction
-            await interaction.response.send_message("Thanks for your positive feedback!", ephemeral=True)
+            # Don't send any acknowledgement message to keep things clean
+            await interaction.response.defer(ephemeral=True)
             
         elif custom_id == "feedback_negative":
             # Negative feedback (score 3/10)
@@ -173,8 +177,8 @@ class BallerCommands(commands.Cog):
                 self.user_feedback = []
             self.user_feedback.append(feedback)
             
-            # Acknowledge the interaction
-            await interaction.response.send_message("Thanks for your feedback. We'll work on improving!", ephemeral=True)
+            # Don't send any acknowledgement message to keep things clean
+            await interaction.response.defer(ephemeral=True)
     
     async def process_conversation(self, message, content):
         """Process a conversational message using the LLM and football-data API"""

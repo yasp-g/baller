@@ -22,7 +22,7 @@ class Config:
     
     # Application modes
     MODE_DEVELOPMENT = "development"  # Local developer testing
-    MODE_TESTING = "testing"          # User testing phase
+    MODE_BETA = "beta"                # Beta testing phase
     MODE_PRODUCTION = "production"    # Live production environment
     
     # Current mode (defaults to ENV value or can be set separately)
@@ -66,8 +66,8 @@ class Config:
     EVALUATION_MAX_DAILY_SAMPLES = int(get_env("EVALUATION_MAX_DAILY_SAMPLES", "100"))
     
     # Feedback Collection
-    COLLECT_FEEDBACK = get_env("COLLECT_FEEDBACK", "true" if APP_MODE in [MODE_DEVELOPMENT, MODE_TESTING] else "false").lower() in ("true", "1", "yes")
-    FEEDBACK_PROMPT = get_env("FEEDBACK_PROMPT", "🧪 Testing phase: How was this response?")
+    COLLECT_FEEDBACK = get_env("COLLECT_FEEDBACK", "true" if APP_MODE in [MODE_DEVELOPMENT, MODE_BETA] else "false").lower() in ("true", "1", "yes")
+    FEEDBACK_PROMPT = get_env("FEEDBACK_PROMPT", "🧪 Beta phase: How was this response?")
     FEEDBACK_POSITIVE_LABEL = get_env("FEEDBACK_POSITIVE_LABEL", "Good bot")
     FEEDBACK_NEGATIVE_LABEL = get_env("FEEDBACK_NEGATIVE_LABEL", "Bad bot")
     FEEDBACK_POSITIVE_STYLE = get_env("FEEDBACK_POSITIVE_STYLE", "3")  # Discord Button Style (3=Green)
