@@ -20,6 +20,14 @@ class Config:
     ENV = get_env("ENV", "development")
     DEBUG = ENV == "development"
     
+    # Application modes
+    MODE_DEVELOPMENT = "development"  # Local developer testing
+    MODE_TESTING = "testing"          # User testing phase
+    MODE_PRODUCTION = "production"    # Live production environment
+    
+    # Current mode (defaults to ENV value or can be set separately)
+    APP_MODE = get_env("APP_MODE", ENV)
+    
     # Discord configuration
     DISCORD_TOKEN = get_env("DISCORD_TOKEN", required=True)
     DISCORD_GUILD_ID = get_env("DISCORD_GUILD_ID")
@@ -58,10 +66,12 @@ class Config:
     EVALUATION_MAX_DAILY_SAMPLES = int(get_env("EVALUATION_MAX_DAILY_SAMPLES", "100"))
     
     # Feedback Collection
-    COLLECT_REACTION_FEEDBACK = get_env("COLLECT_REACTION_FEEDBACK", "true" if ENV == "development" else "false").lower() in ("true", "1", "yes")
-    REACTION_POSITIVE = "👍"
-    REACTION_NEGATIVE = "👎"
-    FEEDBACK_PROMPT = get_env("FEEDBACK_PROMPT", "This bot is in development. Please rate this response with 👍 or 👎")
+    COLLECT_FEEDBACK = get_env("COLLECT_FEEDBACK", "true" if APP_MODE in [MODE_DEVELOPMENT, MODE_TESTING] else "false").lower() in ("true", "1", "yes")
+    FEEDBACK_PROMPT = get_env("FEEDBACK_PROMPT", "🧪 Testing phase: How was this response?")
+    FEEDBACK_POSITIVE_LABEL = get_env("FEEDBACK_POSITIVE_LABEL", "Good bot")
+    FEEDBACK_NEGATIVE_LABEL = get_env("FEEDBACK_NEGATIVE_LABEL", "Bad bot")
+    FEEDBACK_POSITIVE_STYLE = get_env("FEEDBACK_POSITIVE_STYLE", "3")  # Discord Button Style (3=Green)
+    FEEDBACK_NEGATIVE_STYLE = get_env("FEEDBACK_NEGATIVE_STYLE", "4")  # Discord Button Style (4=Red)
     
     @classmethod
     def validate(cls) -> bool:

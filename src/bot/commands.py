@@ -5,6 +5,7 @@ import os
 import json
 import time
 from discord.ext import commands
+from discord import ui, ButtonStyle
 from typing import Optional, Dict, Any, List, Union
 from ..api.sports import FootballAPI
 from ..api.llm import LLMClient
@@ -93,55 +94,87 @@ class BallerCommands(commands.Cog):
         else:
             logger.debug(f"Ignoring non-conversational message: {message.content[:30]}...")
     
+    # Feedback view for button interactions
+    class FeedbackView(ui.View):
+        def __init__(self, commands_instance):
+            super().__init__(timeout=None)  # Buttons don't time out
+            self.commands = commands_instance
+            self.config = config
+            
+            # Add the buttons with configured styles and labels
+            positive_style = ButtonStyle(int(self.config.FEEDBACK_POSITIVE_STYLE))
+            negative_style = ButtonStyle(int(self.config.FEEDBACK_NEGATIVE_STYLE))
+            
+            self.add_item(ui.Button(
+                style=positive_style, 
+                label=self.config.FEEDBACK_POSITIVE_LABEL,
+                custom_id="feedback_positive"
+            ))
+            
+            self.add_item(ui.Button(
+                style=negative_style, 
+                label=self.config.FEEDBACK_NEGATIVE_LABEL,
+                custom_id="feedback_negative"
+            ))
+        
     @commands.Cog.listener()
-    async def on_reaction_add(self, reaction, user):
-        """Handle reactions to bot messages as feedback."""
-        # Ignore reactions from the bot itself
-        if user == self.bot.user:
+    async def on_interaction(self, interaction):
+        """Handle button interactions for feedback."""
+        # Only process button interactions with our custom IDs
+        if not interaction.data or interaction.data.get("component_type") != 2:  # Type 2 is button
             return
             
-        # Check if this is a feedback reaction on a bot message
-        from ..config import config
-        if reaction.message.author == self.bot.user:
-            emoji = str(reaction.emoji)
+        custom_id = interaction.data.get("custom_id", "")
+        
+        if custom_id == "feedback_positive":
+            # Positive feedback (score 8/10)
+            user = interaction.user
+            message_id = interaction.message.id
             
-            if emoji == config.REACTION_POSITIVE:
-                # Positive feedback (score 8/10)
-                logger.info(f"Received positive feedback reaction from {user.name} (ID: {user.id})")
-                self.llm_client.metrics.record("user_feedback_score", 8.0)
-                
-                # Record detailed feedback
-                feedback = {
-                    "user_id": str(user.id),
-                    "message_id": str(reaction.message.id),
-                    "rating": 8,
-                    "reaction": emoji,
-                    "timestamp": datetime.now().isoformat()
-                }
-                
-                # Store the feedback
-                if not hasattr(self, 'user_feedback'):
-                    self.user_feedback = []
-                self.user_feedback.append(feedback)
-                
-            elif emoji == config.REACTION_NEGATIVE:
-                # Negative feedback (score 3/10)
-                logger.info(f"Received negative feedback reaction from {user.name} (ID: {user.id})")
-                self.llm_client.metrics.record("user_feedback_score", 3.0)
-                
-                # Record detailed feedback
-                feedback = {
-                    "user_id": str(user.id),
-                    "message_id": str(reaction.message.id),
-                    "rating": 3,
-                    "reaction": emoji,
-                    "timestamp": datetime.now().isoformat()
-                }
-                
-                # Store the feedback
-                if not hasattr(self, 'user_feedback'):
-                    self.user_feedback = []
-                self.user_feedback.append(feedback)
+            logger.info(f"Received positive button feedback from {user.name} (ID: {user.id})")
+            self.llm_client.metrics.record("user_feedback_score", 8.0)
+            
+            # Record detailed feedback
+            feedback = {
+                "user_id": str(user.id),
+                "message_id": str(message_id),
+                "rating": 8,
+                "type": "button",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Store the feedback
+            if not hasattr(self, 'user_feedback'):
+                self.user_feedback = []
+            self.user_feedback.append(feedback)
+            
+            # Acknowledge the interaction
+            await interaction.response.send_message("Thanks for your positive feedback!", ephemeral=True)
+            
+        elif custom_id == "feedback_negative":
+            # Negative feedback (score 3/10)
+            user = interaction.user
+            message_id = interaction.message.id
+            
+            logger.info(f"Received negative button feedback from {user.name} (ID: {user.id})")
+            self.llm_client.metrics.record("user_feedback_score", 3.0)
+            
+            # Record detailed feedback
+            feedback = {
+                "user_id": str(user.id),
+                "message_id": str(message_id),
+                "rating": 3,
+                "type": "button",
+                "timestamp": datetime.now().isoformat()
+            }
+            
+            # Store the feedback
+            if not hasattr(self, 'user_feedback'):
+                self.user_feedback = []
+            self.user_feedback.append(feedback)
+            
+            # Acknowledge the interaction
+            await interaction.response.send_message("Thanks for your feedback. We'll work on improving!", ephemeral=True)
     
     async def process_conversation(self, message, content):
         """Process a conversational message using the LLM and football-data API"""
@@ -505,23 +538,39 @@ class BallerCommands(commands.Cog):
                 if buffer:
                     response_text += "".join(buffer)
                     
-                    # Add feedback prompt if configured
+                    # Determine if we should add feedback buttons
                     from ..config import config
-                    if config.COLLECT_REACTION_FEEDBACK:
+                    add_feedback = config.COLLECT_FEEDBACK
+                    
+                    # Add feedback prompt if configured
+                    view = None
+                    if add_feedback:
+                        # Add the prompt note to the message
                         feedback_note = f"\n\n_{config.FEEDBACK_PROMPT}_"
                         if len(response_text) + len(feedback_note) <= 2000:
                             response_text += feedback_note
+                        
+                        # Create the feedback view with buttons
+                        view = self.FeedbackView(self)
                     
+                    # Send or edit the message
                     if len(response_text) > 2000:
+                        # For long messages, split them
                         await discord_message.edit(content=response_text[:2000])
-                        await message.channel.send(response_text[2000:])
+                        
+                        # Only add feedback to the last part
+                        if add_feedback and view:
+                            # Send the overflow as a new message with feedback buttons
+                            await message.channel.send(content=response_text[2000:], view=view)
+                        else:
+                            # Send without buttons
+                            await message.channel.send(content=response_text[2000:])
                     else:
-                        await discord_message.edit(content=response_text)
-                    
-                    # Add reaction emoji for feedback if configured
-                    if config.COLLECT_REACTION_FEEDBACK:
-                        await discord_message.add_reaction(config.REACTION_POSITIVE)
-                        await discord_message.add_reaction(config.REACTION_NEGATIVE)
+                        # For messages that fit in one part
+                        if add_feedback and view:
+                            await discord_message.edit(content=response_text, view=view)
+                        else:
+                            await discord_message.edit(content=response_text)
                 
                 # Final complete response for history and evaluation (without feedback prompt)
                 response = "".join(full_response)
