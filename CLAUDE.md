@@ -1,6 +1,17 @@
 # CLAUDE.md - Baller Project Guidelines
 
-## Build & Test Commands
+## Build, Run & Test Commands
+### Dependencies
+- **Install dependencies**: `uv add --editable .` (project) or `uv add [package]` (single package)
+- **Install dev dependencies**: `uv add --editable --dev ".[dev]"`
+
+### Running the app
+- **Run in development mode**: `uv run python -m src.main`
+- **Run in beta mode**: `APP_MODE=beta uv run python -m src.main` (enables feedback buttons)
+- **Run in production mode**: `APP_MODE=production ENV=production uv run python -m src.main`
+- **Run with detailed logging**: `LOG_LEVEL=DEBUG uv run python -m src.main | jq -r '. | "\(.timestamp) [\(.level)] \(.logger): \(.message)"'`
+
+### Tests
 - **Run all tests**: `uv run python -m pytest tests/`
 - **Run unit tests only**: `uv run python -m pytest tests/unit/`
 - **Run integration tests only**: `uv run python -m pytest tests/integration/`
@@ -8,9 +19,7 @@
   - `uv run python -m pytest tests/unit/api/` (API unit tests)
   - `uv run python -m pytest tests/unit/bot/` (Bot unit tests)
 - **Run a specific test file**: `uv run python -m pytest tests/unit/api/test_llm.py`
-- **Install dependencies**: `uv add --editable .` (project) or `uv add [package]` (single package)
-- **Install dev dependencies**: `uv add --editable --dev ".[dev]"`
-- **Run the app**: `uv run python -m src.main`
+
 
 ## System Architecture
 
