@@ -1,0 +1,60 @@
+# Example terraform variables for production environment
+# Copy to terraform.tfvars and modify as needed
+# This file should NOT be committed to git
+
+###########################
+# Core Settings
+###########################
+
+environment = "prod"
+aws_region  = "eu-central-1"
+project     = "baller"
+
+tags = {
+  ManagedBy   = "Terraform"
+  Environment = "Production"
+  Project     = "Baller"
+  Owner       = "Operations"
+  CostCenter  = "Prod"
+}
+
+###########################
+# DynamoDB Settings - Production Overrides
+###########################
+
+# Use PROVISIONED for production for predictable performance
+dynamodb_billing_mode = "PROVISIONED"
+
+# Higher capacity for production tables with high traffic
+conversations_table_read_capacity = 10
+conversations_table_write_capacity = 10
+messages_table_read_capacity = 20
+messages_table_write_capacity = 20
+
+# Longer retention periods for production
+conversation_retention_days = 90
+message_retention_days = 90
+api_interaction_retention_days = 30
+llm_interaction_retention_days = 30
+
+###########################
+# S3 Settings - Production Overrides
+###########################
+
+# More conservative lifecycle rules for production
+s3_standard_ia_transition_days = 60
+s3_glacier_transition_days = 180
+s3_expiration_days = 365  # 1 year
+
+###########################
+# OpenSearch Settings - Production Overrides
+###########################
+
+# Larger, multi-node setup for production
+opensearch_instance_type = "m5.large.elasticsearch"
+opensearch_instance_count = 3
+opensearch_ebs_volume_size = 50
+dedicated_master_enabled = true
+dedicated_master_type = "m5.large.elasticsearch"
+dedicated_master_count = 3
+zone_awareness_enabled = true
