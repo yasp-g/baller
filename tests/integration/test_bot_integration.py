@@ -93,7 +93,14 @@ class TestBotIntegration:
         """Test the full flow from message to response"""
         # Setup mock API responses
         cog_instance._mock_football_api.get_matches = AsyncMock(return_value=sample_matches_data)
-        cog_instance._mock_llm_client.generate_response = AsyncMock(return_value="Here are the upcoming matches")
+        
+        # Create a mock async generator for streaming responses
+        async def mock_stream_generator():
+            yield "Here are the "
+            yield "upcoming matches"
+            
+        # Setup LLM client to handle streaming responses
+        cog_instance._mock_llm_client.generate_response = AsyncMock(return_value=mock_stream_generator())
         
         # Setup message with match-related content
         mock_discord_message.content = "What matches are happening this week?"
@@ -101,6 +108,11 @@ class TestBotIntegration:
         # Setup content filter to return relevant
         mock_content_filter.is_relevant = AsyncMock(return_value=(True, "About football"))
         cog_instance.content_filter = mock_content_filter
+        
+        # Setup mock Discord message features
+        mock_sent_message = MagicMock()
+        mock_sent_message.edit = AsyncMock()
+        mock_discord_message.channel.send = AsyncMock(return_value=mock_sent_message)
         
         # Process the message
         await cog_instance.process_conversation(mock_discord_message, mock_discord_message.content)
@@ -117,9 +129,14 @@ class TestBotIntegration:
         assert call_args[0][0] == "What matches are happening this week?"
         assert call_args[0][1] == sample_matches_data
         
-        # Verify response was sent to channel
+        # Verify response stream was processed and sent to channel
         assert mock_discord_message.channel.send.called
-        assert mock_discord_message.channel.send.call_args[0][0] == "Here are the upcoming matches"
+        assert mock_sent_message.edit.called
+        
+        # Check the final edit contains the complete message
+        # Get the most recent call to edit
+        latest_edit_call = mock_sent_message.edit.call_args_list[-1]
+        assert "Here are the upcoming matches" in latest_edit_call[1]["content"]
     
     async def test_api_component_registration(self):
         """Test that API components are properly registered with each other"""
