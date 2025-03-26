@@ -4,13 +4,21 @@ terraform {
   # Use partial configuration with minimal settings
   # Complete settings will be loaded from state.config (gitignored)
   # Run: terraform init -backend-config="state.config"
-  backend "remote" {}
+  backend "remote" {
+    workspaces {
+      name = "baller-dev"
+    }
+  }
+  
+  # Provider requirements are inherited from the root module
 }
 
 module "baller" {
   source = "../.."
   
+  # Core settings
   environment = "dev"
-  aws_region  = "us-east-1"
-  project     = "baller"
+  
+  # Additional variables can be set in terraform.tfvars
+  # Variables not specified here will use root module defaults
 }
