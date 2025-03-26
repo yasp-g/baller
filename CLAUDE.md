@@ -6,14 +6,15 @@
 - **Install dev dependencies**: `uv add --editable --dev ".[dev]"`
 
 ### Running the app
-- **Run in development mode**: `uv run python -m src.main`
-- **Run in beta mode**: `APP_MODE=beta uv run python -m src.main` (enables feedback buttons)
-- **Run in production mode**: `APP_MODE=production ENV=production uv run python -m src.main`
-- **Customize feedback collection**: 
-  - Disable feedback: `COLLECT_FEEDBACK=false uv run python -m src.main`
-  - Customize prompt: `FEEDBACK_PROMPT="Rate my response!" uv run python -m src.main`
-  - Customize button labels: `FEEDBACK_POSITIVE_LABEL="👍 Great!" FEEDBACK_NEGATIVE_LABEL="👎 Needs work" uv run python -m src.main`
-- **Run with detailed logging**: `LOG_LEVEL=DEBUG uv run python -m src.main | jq -r '. | "\(.timestamp) [\(.level)] \(.logger): \(.message)"'`
+- **Production mode**: `APP_MODE=production ENV=production uv run python -m src.main`
+- **Development mode**: `uv run python -m src.main`
+- **Beta mode**: `APP_MODE=beta uv run python -m src.main` (enables feedback buttons)
+  - **Customize feedback collection**: 
+    - Enable feedback in other modes: `COLLECT_FEEDBACK=true uv run python -m src.main`
+    - Customize prompt: `APP_MODE=beta FEEDBACK_PROMPT="Rate my response!" uv run python -m src.main`
+    - Customize button labels: `APP_MODE=beta FEEDBACK_POSITIVE_LABEL="👍 Great!" FEEDBACK_NEGATIVE_LABEL="👎 Needs work" uv run python -m src.main`
+- **Detailed logging**: `LOG_LEVEL=DEBUG uv run python -m src.main | jq -r '. | "\(.timestamp) [\(.level)] \(.logger): \(.message)"'`
+- **Beta mode, detailed logging**: `APP_MODE=beta LOG_LEVEL=DEBUG uv run python -m src.main | jq -r '. | "\(.timestamp) [\(.level)] \(.logger): \(.message)"'`
 
 ### Tests
 - **Run all tests**: `uv run python -m pytest tests/`
