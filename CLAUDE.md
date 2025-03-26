@@ -350,15 +350,11 @@ docker run -e DISCORD_TOKEN=xxx -e FOOTBALL_DATA_API_KEY=xxx -e DEEPSEEK_API_KEY
   | sort activity desc
   ```
 
-### Implementation Roadmap
+### Application and AWS Integration
 
-1. **Complete Infrastructure** ✅
-   - Define all required AWS resources in Terraform ✅
-   - Configure security settings and access policies ✅
-   - Set up environment-specific configurations ✅
+For implementation status and planned AWS integration work, see the [ROADMAP.md](./ROADMAP.md) file.
 
-2. **Next Steps**:
-   - Implement boto3 integration in conversation.py and preferences.py
-   - Add AWS credentials configuration in config.py
-   - Set up CloudWatch metrics for conversation statistics
-   - Create deployment pipeline for infrastructure
+The primary integration points for application code are:
+- `src/bot/conversation.py` for conversation data persistence
+- `src/bot/preferences.py` for user preferences persistence 
+- `config.py` for AWS credentials and configuration
