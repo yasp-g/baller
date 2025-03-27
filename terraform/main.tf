@@ -6,10 +6,10 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.1.0"
+      version = "~>5.40.0"
     }
   }
-  required_version = ">= 1.5.0"
+  required_version = ">= 1.9.0"
 }
 
 # Provider configurations
@@ -22,7 +22,7 @@ provider "aws" {
       {
         Environment = var.environment
         Project     = var.project
-        ManagedBy   = "Terraform"
+        ManagedBy   = "OpenTofu"
       }
     )
   }
