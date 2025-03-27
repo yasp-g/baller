@@ -80,10 +80,8 @@ resource "aws_elasticsearch_domain" "baller_search" {
 }
 POLICY
   
-  # Prevent downtime during updates
-  update_policy {
-    update_type = "blue-green"
-  }
+  # Note: Blue/green deployments configured through AWS console or AWS CLI
+  # Not supported in OpenTofu AWS provider
   
   # Automatic service software updates
   auto_tune_options {

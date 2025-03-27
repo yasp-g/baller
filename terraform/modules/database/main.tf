@@ -28,19 +28,8 @@ resource "aws_dynamodb_table" "conversations" {
   range_key    = "conversation_id"
   
   # Provisioned capacity settings (only used if billing_mode is PROVISIONED)
-  dynamic "read_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      read_capacity = var.conversations_table_read_capacity
-    }
-  }
-  
-  dynamic "write_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      write_capacity = var.conversations_table_write_capacity
-    }
-  }
+  read_capacity  = local.is_provisioned ? var.conversations_table_read_capacity : null
+  write_capacity = local.is_provisioned ? var.conversations_table_write_capacity : null
   
   # Primary key attributes
   attribute {
@@ -115,19 +104,8 @@ resource "aws_dynamodb_table" "messages" {
   range_key    = "message_id"
   
   # Provisioned capacity settings
-  dynamic "read_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      read_capacity = var.messages_table_read_capacity
-    }
-  }
-  
-  dynamic "write_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      write_capacity = var.messages_table_write_capacity
-    }
-  }
+  read_capacity  = local.is_provisioned ? var.messages_table_read_capacity : null
+  write_capacity = local.is_provisioned ? var.messages_table_write_capacity : null
   
   # Primary key attributes
   attribute {
@@ -202,19 +180,8 @@ resource "aws_dynamodb_table" "preferences" {
   range_key    = "server_id"
   
   # Provisioned capacity settings
-  dynamic "read_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      read_capacity = var.preferences_table_read_capacity
-    }
-  }
-  
-  dynamic "write_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      write_capacity = var.preferences_table_write_capacity
-    }
-  }
+  read_capacity  = local.is_provisioned ? var.preferences_table_read_capacity : null
+  write_capacity = local.is_provisioned ? var.preferences_table_write_capacity : null
   
   # Primary key attributes
   attribute {
@@ -269,19 +236,8 @@ resource "aws_dynamodb_table" "api_interactions" {
   range_key    = "api_call_id"
   
   # Provisioned capacity settings
-  dynamic "read_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      read_capacity = var.api_interactions_table_read_capacity
-    }
-  }
-  
-  dynamic "write_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      write_capacity = var.api_interactions_table_write_capacity
-    }
-  }
+  read_capacity  = local.is_provisioned ? var.api_interactions_table_read_capacity : null
+  write_capacity = local.is_provisioned ? var.api_interactions_table_write_capacity : null
   
   # Primary key attributes
   attribute {
@@ -342,19 +298,8 @@ resource "aws_dynamodb_table" "llm_interactions" {
   range_key    = "llm_call_id"
   
   # Provisioned capacity settings
-  dynamic "read_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      read_capacity = var.llm_interactions_table_read_capacity
-    }
-  }
-  
-  dynamic "write_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      write_capacity = var.llm_interactions_table_write_capacity
-    }
-  }
+  read_capacity  = local.is_provisioned ? var.llm_interactions_table_read_capacity : null
+  write_capacity = local.is_provisioned ? var.llm_interactions_table_write_capacity : null
   
   # Primary key attributes
   attribute {
@@ -432,19 +377,8 @@ resource "aws_dynamodb_table" "feedback" {
   hash_key     = "message_id"
   
   # Provisioned capacity settings
-  dynamic "read_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      read_capacity = var.feedback_table_read_capacity
-    }
-  }
-  
-  dynamic "write_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      write_capacity = var.feedback_table_write_capacity
-    }
-  }
+  read_capacity  = local.is_provisioned ? var.feedback_table_read_capacity : null
+  write_capacity = local.is_provisioned ? var.feedback_table_write_capacity : null
   
   # Primary key attributes
   attribute {
@@ -510,19 +444,8 @@ resource "aws_dynamodb_table" "entity_cache" {
   range_key    = "entity_id"
   
   # Provisioned capacity settings
-  dynamic "read_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      read_capacity = var.entity_cache_table_read_capacity
-    }
-  }
-  
-  dynamic "write_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      write_capacity = var.entity_cache_table_write_capacity
-    }
-  }
+  read_capacity  = local.is_provisioned ? var.entity_cache_table_read_capacity : null
+  write_capacity = local.is_provisioned ? var.entity_cache_table_write_capacity : null
   
   # Primary key attributes
   attribute {
@@ -577,19 +500,8 @@ resource "aws_dynamodb_table" "metrics" {
   range_key    = "metric_id"
   
   # Provisioned capacity settings
-  dynamic "read_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      read_capacity = var.metrics_table_read_capacity
-    }
-  }
-  
-  dynamic "write_capacity" {
-    for_each = local.is_provisioned ? [1] : []
-    content {
-      write_capacity = var.metrics_table_write_capacity
-    }
-  }
+  read_capacity  = local.is_provisioned ? var.metrics_table_read_capacity : null
+  write_capacity = local.is_provisioned ? var.metrics_table_write_capacity : null
   
   # Primary key attributes
   attribute {
