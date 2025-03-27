@@ -33,7 +33,7 @@ variable "tags" {
 variable "table_billing_mode" {
   description = "DynamoDB billing mode (PROVISIONED or PAY_PER_REQUEST)"
   type        = string
-  default     = "PAY_PER_REQUEST"
+  default     = "PROVISIONED"
 }
 
 variable "enable_encryption" {
@@ -45,7 +45,7 @@ variable "enable_encryption" {
 variable "enable_point_in_time_recovery" {
   description = "Enable point-in-time recovery for all tables"
   type        = bool
-  default     = true
+  default     = false
 }
 
 ###########################

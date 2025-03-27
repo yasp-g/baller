@@ -25,7 +25,7 @@ resource "aws_dynamodb_table" "conversations" {
   name         = "${local.table_prefix}-conversations"
   billing_mode = var.table_billing_mode
   hash_key     = "user_id"
-  sort_key     = "conversation_id"
+  range_key    = "conversation_id"
   
   # Provisioned capacity settings (only used if billing_mode is PROVISIONED)
   dynamic "read_capacity" {
@@ -112,7 +112,7 @@ resource "aws_dynamodb_table" "messages" {
   name         = "${local.table_prefix}-messages"
   billing_mode = var.table_billing_mode
   hash_key     = "conversation_id"
-  sort_key     = "message_id"
+  range_key    = "message_id"
   
   # Provisioned capacity settings
   dynamic "read_capacity" {
@@ -199,7 +199,7 @@ resource "aws_dynamodb_table" "preferences" {
   name         = "${local.table_prefix}-preferences"
   billing_mode = var.table_billing_mode
   hash_key     = "user_id"
-  sort_key     = "server_id"
+  range_key    = "server_id"
   
   # Provisioned capacity settings
   dynamic "read_capacity" {
@@ -266,7 +266,7 @@ resource "aws_dynamodb_table" "api_interactions" {
   name         = "${local.table_prefix}-api-interactions"
   billing_mode = var.table_billing_mode
   hash_key     = "message_id"
-  sort_key     = "api_call_id"
+  range_key    = "api_call_id"
   
   # Provisioned capacity settings
   dynamic "read_capacity" {
@@ -339,7 +339,7 @@ resource "aws_dynamodb_table" "llm_interactions" {
   name         = "${local.table_prefix}-llm-interactions"
   billing_mode = var.table_billing_mode
   hash_key     = "message_id"
-  sort_key     = "llm_call_id"
+  range_key    = "llm_call_id"
   
   # Provisioned capacity settings
   dynamic "read_capacity" {
@@ -507,7 +507,7 @@ resource "aws_dynamodb_table" "entity_cache" {
   name         = "${local.table_prefix}-entity-cache"
   billing_mode = var.table_billing_mode
   hash_key     = "entity_type"
-  sort_key     = "entity_id"
+  range_key    = "entity_id"
   
   # Provisioned capacity settings
   dynamic "read_capacity" {
@@ -574,7 +574,7 @@ resource "aws_dynamodb_table" "metrics" {
   name         = "${local.table_prefix}-metrics"
   billing_mode = var.table_billing_mode
   hash_key     = "metric_date"
-  sort_key     = "metric_id"
+  range_key    = "metric_id"
   
   # Provisioned capacity settings
   dynamic "read_capacity" {

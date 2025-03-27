@@ -33,7 +33,7 @@ variable "tags" {
 variable "opensearch_instance_type" {
   description = "Instance type for OpenSearch nodes"
   type        = string
-  default     = "t3.small.elasticsearch"
+  default     = "t3.micro.elasticsearch"
 }
 
 variable "opensearch_instance_count" {
@@ -45,7 +45,7 @@ variable "opensearch_instance_count" {
 variable "opensearch_ebs_volume_size" {
   description = "Size of EBS volumes attached to OpenSearch nodes (GB)"
   type        = number
-  default     = 10
+  default     = 8  # Minimum allowed size
 }
 
 variable "opensearch_ebs_volume_type" {
@@ -79,7 +79,7 @@ variable "dedicated_master_enabled" {
 variable "dedicated_master_type" {
   description = "Instance type of the dedicated master nodes"
   type        = string
-  default     = "t3.small.elasticsearch"
+  default     = "t3.micro.elasticsearch"
 }
 
 variable "dedicated_master_count" {

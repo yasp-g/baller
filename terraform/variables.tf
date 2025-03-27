@@ -41,7 +41,7 @@ variable "tags" {
 variable "dynamodb_billing_mode" {
   description = "DynamoDB billing mode (PROVISIONED or PAY_PER_REQUEST)"
   type        = string
-  default     = "PAY_PER_REQUEST"
+  default     = "PROVISIONED"
 }
 
 variable "dynamodb_enable_encryption" {
@@ -53,7 +53,7 @@ variable "dynamodb_enable_encryption" {
 variable "dynamodb_enable_point_in_time_recovery" {
   description = "Enable point-in-time recovery for DynamoDB tables"
   type        = bool
-  default     = true
+  default     = false
 }
 
 ###########################
@@ -63,7 +63,7 @@ variable "dynamodb_enable_point_in_time_recovery" {
 variable "s3_versioning_enabled" {
   description = "Enable versioning for S3 buckets"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "s3_lifecycle_rules_enabled" {
@@ -97,7 +97,7 @@ variable "s3_expiration_days" {
 variable "opensearch_instance_type" {
   description = "Instance type for OpenSearch nodes"
   type        = string
-  default     = "t3.small.elasticsearch"
+  default     = "t3.micro.elasticsearch"
 }
 
 variable "opensearch_instance_count" {
@@ -109,5 +109,5 @@ variable "opensearch_instance_count" {
 variable "opensearch_ebs_volume_size" {
   description = "Size of EBS volumes attached to OpenSearch nodes (GB)"
   type        = number
-  default     = 10
+  default     = 8  # Minimum allowed size
 }
