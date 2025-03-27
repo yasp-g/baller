@@ -15,7 +15,7 @@ project    = "baller"
 ###########################
 
 tags = {
-  ManagedBy   = "Terraform"
+  ManagedBy   = "OpenTofu"
   Project     = "Baller"
   CostCenter  = "Engineering"
   Owner       = "DevOps"

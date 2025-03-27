@@ -11,7 +11,7 @@ aws_region  = "eu-central-1"
 project     = "baller"
 
 tags = {
-  ManagedBy   = "Terraform"
+  ManagedBy   = "OpenTofu"
   Environment = "Production"
   Project     = "Baller"
   Owner       = "Operations"
