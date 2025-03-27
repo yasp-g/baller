@@ -164,7 +164,7 @@ A comprehensive database design is available in [/docs/DATABASE_PLAN.md](./docs/
 - `/docs/`: Documentation files
   - `/docs/DATABASE_PLAN.md`: Comprehensive database schema and storage strategy
 - `/terraform/`: Infrastructure as Code
-  - `/terraform/modules/`: Reusable Terraform configurations
+  - `/terraform/modules/`: Reusable OpenTofu configurations
     - `/terraform/modules/database/`: DynamoDB tables configuration
     - `/terraform/modules/storage/`: S3 buckets configuration
     - `/terraform/modules/search/`: OpenSearch configuration
@@ -187,7 +187,7 @@ A comprehensive database design is available in [/docs/DATABASE_PLAN.md](./docs/
   - `feat(api): Add team player stats endpoint`
   - `fix(bot): Handle missing data in conversation response`
   - `refactor(llm): Standardize prompt templates`
-  - `feat(infra): Set up Terraform configuration for AWS resources`
+  - `feat(infra): Set up OpenTofu configuration for AWS resources`
   - `docs(database): Create database schema documentation`
 - **First line**: Maximum 72 characters, no period at end
 - **Body**: Optional, used for explaining complex changes or breaking changes
@@ -195,13 +195,13 @@ A comprehensive database design is available in [/docs/DATABASE_PLAN.md](./docs/
 
 ## General Notes
 - **Deployment Infrastructure**: AWS services will be used to deploy and support the application
-  - Terraform manages all infrastructure as code using a modular approach
+  - OpenTofu manages all infrastructure as code using a modular approach
   - Infrastructure components include:
     - DynamoDB for structured data (conversations, user preferences, metadata)
     - S3 for large object storage (API responses, LLM interactions)
     - OpenSearch for analytics and searching conversation data
   - Each environment (dev, staging, prod) has independent configurations
-  - Scalr is used as the Terraform state backend
+  - Scalr is used as the OpenTofu state backend
 
 ## Monitoring & Debugging
 

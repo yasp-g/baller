@@ -1,6 +1,6 @@
-# Baller Infrastructure - Terraform
+# Baller Infrastructure - OpenTofu
 
-This directory contains the Terraform configuration for Baller's AWS infrastructure, including database resources, storage, and search capabilities.
+This directory contains the OpenTofu configuration for Baller's AWS infrastructure, including database resources, storage, and search capabilities.
 
 ## Directory Structure
 
@@ -24,7 +24,7 @@ This directory contains the Terraform configuration for Baller's AWS infrastruct
 
 ## Variable Management Structure
 
-The Terraform configuration uses a hierarchical variable management approach:
+The OpenTofu configuration uses a hierarchical variable management approach:
 
 ```
 terraform/
@@ -72,28 +72,28 @@ Creates and configures DynamoDB tables as defined in the [Database Plan](/docs/D
 
 #### Core Data Tables
 - `baller-conversations` - Stores user conversation data
-  - Partition Key: `user_id`, Sort Key: `conversation_id`
+  - Partition Key: `user_id`, Range Key: `conversation_id`
   - GSIs: `ServerIndex`, `CreatedAtIndex`
   - TTL-based expiry
 
 - `baller-messages` - Stores individual message data
-  - Partition Key: `conversation_id`, Sort Key: `message_id`
+  - Partition Key: `conversation_id`, Range Key: `message_id`
   - GSIs: `UserMessageIndex`, `IntentIndex`
   - Tracks processing metadata and references to S3 objects
 
 - `baller-preferences` - Stores user preferences and settings
-  - Partition Key: `user_id`, Sort Key: `server_id`
+  - Partition Key: `user_id`, Range Key: `server_id`
   - GSI: `ServerIndex`
   - Persistent storage (no TTL)
 
 #### API & LLM Interaction Tables
 - `baller-api-interactions` - Tracks API calls with metadata
-  - Partition Key: `message_id`, Sort Key: `api_call_id`
+  - Partition Key: `message_id`, Range Key: `api_call_id`
   - GSI: `EndpointIndex`
   - Links to S3 for complete response storage
 
 - `baller-llm-interactions` - Tracks LLM usage and responses
-  - Partition Key: `message_id`, Sort Key: `llm_call_id`
+  - Partition Key: `message_id`, Range Key: `llm_call_id`
   - GSIs: `ProviderModelIndex`, `PurposeIndex`
   - Performance metrics and token usage
 
@@ -104,12 +104,12 @@ Creates and configures DynamoDB tables as defined in the [Database Plan](/docs/D
   - Persistent storage for long-term analysis
 
 - `baller-entity-cache` - Caches entity data (teams, competitions)
-  - Partition Key: `entity_type`, Sort Key: `entity_id`
+  - Partition Key: `entity_type`, Range Key: `entity_id`
   - GSI: `NameIndex`
   - TTL-based refresh mechanism
 
 - `baller-metrics` - Stores application performance metrics
-  - Partition Key: `metric_date`, Sort Key: `metric_id`
+  - Partition Key: `metric_date`, Range Key: `metric_id`
   - GSIs: `CategoryIndex`, `AppModeIndex`
   - Persistent storage for historical analysis
 
@@ -164,9 +164,9 @@ Each environment (dev, staging, prod) has its own configuration that references 
 
 ### Prerequisites
 
-- [Terraform](https://www.terraform.io/downloads.html) (v1.0.0+)
+- [OpenTofu](https://opentofu.org/docs/intro/install/) (v1.9.0+)
 - AWS CLI configured with appropriate credentials
-- Scalr account for state management
+- S3 or other backend for state management (optional)
 
 ### Deploying to an Environment
 
@@ -183,22 +183,22 @@ cp ../../state.config.example state.config
 # Edit state.config with your actual Scalr credentials
 ```
 
-#### 3. Initialize Terraform:
+#### 3. Initialize OpenTofu:
 
 ```bash
-terraform init -backend-config="state.config"
+tofu init -backend-config="state.config"
 ```
 
 #### 4. Plan the deployment:
 
 ```bash
-terraform plan
+tofu plan
 ```
 
 #### 5. Apply the changes:
 
 ```bash
-terraform apply
+tofu apply
 ```
 
 ### Destroying Resources
@@ -207,18 +207,18 @@ To destroy resources for an environment:
 
 ```bash
 cd terraform/environments/dev
-terraform destroy
+tofu destroy
 ```
 
 ## State Management
 
 ### Scalr as Backend
 
-This project uses Scalr as the Terraform state backend. The configuration follows security best practices by using a partial configuration approach:
+This project uses Scalr as the OpenTofu state backend. The configuration follows security best practices by using a partial configuration approach:
 
 1. The `terraform { backend "remote" {} }` block contains minimal configuration in version control
 2. Sensitive configuration is stored in a `state.config` file that is not committed to git
-3. The backend is initialized with: `terraform init -backend-config="state.config"`
+3. The backend is initialized with: `tofu init -backend-config="state.config"`
 
 ### Setting Up State Configuration
 
@@ -235,7 +235,7 @@ For each environment:
    organization = "env-your-environment-id"
    workspaces   = { name = "baller-dev" }  # Use the appropriate environment name
    ```
-3. Run Terraform initialization with this config file
+3. Run OpenTofu initialization with this config file
 
 ### CI/CD Configuration
 
@@ -243,7 +243,7 @@ For CI/CD pipelines, use environment secrets to create the `state.config` file d
 
 ```yaml
 # Example GitHub Actions step
-- name: Create Terraform Backend Config
+- name: Create OpenTofu Backend Config
   run: |
     cat > state.config <<EOF
     hostname     = "${{ secrets.SCALR_HOSTNAME }}"
@@ -251,17 +251,38 @@ For CI/CD pipelines, use environment secrets to create the `state.config` file d
     workspaces   = { name = "${{ secrets.SCALR_WORKSPACE }}" }
     EOF
     
-- name: Terraform Init
-  run: terraform init -backend-config="state.config"
+- name: OpenTofu Init
+  run: tofu init -backend-config="state.config"
 ```
+
+## AWS Free Tier Optimization
+
+The development environment is configured to optimize for AWS Free Tier usage:
+
+### DynamoDB Free Tier Optimizations
+- `PROVISIONED` billing mode with low capacity units (maximum 5 per table)
+- Disabled point-in-time recovery to reduce costs
+- Reduced TTL retention periods to minimize storage
+- Free tier includes 25 WCU and 25 RCU across all tables
+
+### S3 Free Tier Optimizations
+- Versioning disabled to reduce storage costs
+- Aggressive lifecycle rules to transition to cheaper storage classes
+- Free tier includes 5GB of Standard storage
+
+### OpenSearch Optimizations
+- Uses `t3.micro.elasticsearch` instances (smallest available)
+- Minimum EBS volume size (8GB)
+- Single node deployment
+- Note: OpenSearch is not included in the free tier, but this is the most economical configuration
 
 ## Tagging Strategy
 
 All resources are tagged with:
 
 - `Project`: "baller"
-- `Environment`: "dev", "staging", or "prod"
-- `ManagedBy`: "terraform"
+- `Environment`: "dev", "staging", or "prod" 
+- `ManagedBy`: "OpenTofu"
 
 ## Security Considerations
 

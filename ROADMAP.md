@@ -16,9 +16,10 @@
 5. ✅ Implement intent detection system for better query understanding
 6. ✅ Implement content filtering for improved relevance and safety
 7. ✅ Standardize prompt templates across different LLM providers
-8. Reevaluate pyproject.toml and esnure it aligns with `uv` best practices
+8. Deployment and Operations (5.2), Implement AWS SDK integration (see below)
+9. Reevaluate pyproject.toml and esnure it aligns with `uv` best practices
     - I'm not sure `[project.optional-dependencies]` is the best when `uv` has a built-in development dependencies workflow (`[dependency-groups]`)
-9. Implement caching for frequently accessed football data
+10. Implement caching for frequently accessed football data
 
 
 ## 1. Core Infrastructure Improvements
@@ -155,8 +156,8 @@
   - Created schema definitions for DynamoDB tables, S3 storage, and OpenSearch
   - Built data lifecycle management plans for cost optimization
   - Defined proper relationships between storage components
-- ✅ Implement infrastructure as code with Terraform
-  - Created modular Terraform configuration for all AWS resources
+- ✅ Implement infrastructure as code with OpenTofu
+  - Created modular OpenTofu configuration for all AWS resources
   - Built environment-specific configurations (dev, staging, prod)
   - Implemented hierarchical variable management system
   - Set up remote state storage with Scalr backend
