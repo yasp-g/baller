@@ -55,7 +55,7 @@ We'll use a combination of technologies to optimize for different data character
 
 **Table Name:** `baller-conversations`
 **Partition Key:** `user_id` (String)
-**Sort Key:** `conversation_id` (String)
+**Range Key:** `conversation_id` (String)
 
 **Key Design Justification:**
 Using `user_id` as the PK rather than `server_id` is optimal because:
@@ -89,7 +89,7 @@ Using `user_id` as the PK rather than `server_id` is optimal because:
 
 **Table Name:** `baller-messages`
 **Partition Key:** `conversation_id` (String)
-**Sort Key:** `message_id` (String)
+**Range Key:** `message_id` (String)
 
 **Attributes:**
 - `conversation_id` (String): Link to parent conversation
@@ -128,7 +128,7 @@ Using `user_id` as the PK rather than `server_id` is optimal because:
 
 **Table Name:** `baller-preferences`
 **Partition Key:** `user_id` (String)
-**Sort Key:** `server_id` (String)
+**Range Key:** `server_id` (String)
 
 **Key Design Justification:**
 Using `user_id` as PK and `server_id` as SK is optimal because:
@@ -158,7 +158,7 @@ Using `user_id` as PK and `server_id` as SK is optimal because:
 
 **Table Name:** `baller-api-interactions`
 **Partition Key:** `message_id` (String)
-**Sort Key:** `api_call_id` (String)
+**Range Key:** `api_call_id` (String)
 
 **Attributes:**
 - `message_id` (String): Associated message identifier
@@ -181,7 +181,7 @@ Using `user_id` as PK and `server_id` as SK is optimal because:
 
 **Table Name:** `baller-llm-interactions`
 **Partition Key:** `message_id` (String)
-**Sort Key:** `llm_call_id` (String)
+**Range Key:** `llm_call_id` (String)
 
 **Attributes:**
 - `message_id` (String): Associated message identifier
@@ -227,7 +227,7 @@ Using `user_id` as PK and `server_id` as SK is optimal because:
 
 **Table Name:** `baller-entity-cache`
 **Partition Key:** `entity_type` (String)
-**Sort Key:** `entity_id` (String)
+**Range Key:** `entity_id` (String)
 
 **Attributes:**
 - `entity_type` (String): Type of entity (team, competition, player)
@@ -246,7 +246,7 @@ Using `user_id` as PK and `server_id` as SK is optimal because:
 
 **Table Name:** `baller-metrics`
 **Partition Key:** `metric_date` (String) - YYYY-MM-DD
-**Sort Key:** `metric_id` (String) - category:name
+**Range Key:** `metric_id` (String) - category:name
 
 **Attributes:**
 - `metric_date` (String): Date of metric
